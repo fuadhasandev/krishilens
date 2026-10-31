@@ -3,7 +3,11 @@ import type { ErrorRequestHandler } from 'express'
 
 export const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
   if (error instanceof SyntaxError && 'body' in error) {
-    response.status(400).json({ error: 'Invalid JSON request body.' })
+    response.status(400).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'Invalid JSON request body.',
+    })
     return
   }
 
@@ -12,7 +16,11 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     'type' in error &&
     error.type === 'entity.too.large'
   ) {
-    response.status(413).json({ error: 'Request body exceeds the 1 MB limit.' })
+    response.status(413).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'Request body exceeds the 1 MB limit.',
+    })
     return
   }
 
@@ -22,10 +30,18 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
       error.code === 'LIMIT_FILE_SIZE'
         ? 'Image must be 5 MB or smaller.'
         : 'The image upload is invalid. Upload one image and try again.'
-    response.status(statusCode).json({ success: false, error: message })
+    response.status(statusCode).json({
+      success: false,
+      errorCode: error.code === 'LIMIT_FILE_SIZE' ? 'INVALID_IMAGE' : 'INVALID_REQUEST',
+      error: message,
+    })
     return
   }
 
   console.error('Unhandled request error:', error)
-  response.status(500).json({ error: 'An unexpected server error occurred.' })
+  response.status(500).json({
+    success: false,
+    errorCode: 'ANALYSIS_FAILED',
+    error: 'An unexpected server error occurred.',
+  })
 }

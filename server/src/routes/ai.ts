@@ -17,6 +17,7 @@ aiRouter.post('/ai/analyze', async (request, response) => {
   if (!parsed.success) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       model: META_MODEL,
       answer: 'Please provide a supported crop, a question of 3–2000 characters, and a response language (Bangla or English).',
     })
@@ -33,6 +34,11 @@ aiRouter.post('/ai/analyze', async (request, response) => {
     if (error instanceof MetaServiceError) {
       response.status(error.statusCode).json({
         success: false,
+        errorCode: error.statusCode === 429
+          ? 'RATE_LIMITED'
+          : error.statusCode === 503
+            ? 'MODEL_UNAVAILABLE'
+            : 'ANALYSIS_FAILED',
         model: META_MODEL,
         answer: error.message,
         ...(error.requestId ? { requestId: error.requestId } : {}),
@@ -43,6 +49,7 @@ aiRouter.post('/ai/analyze', async (request, response) => {
     console.error('Crop analysis failed due to an unexpected error.')
     response.status(502).json({
       success: false,
+      errorCode: 'ANALYSIS_FAILED',
       model: META_MODEL,
       answer: 'We could not complete the analysis right now. Please try again later.',
     })

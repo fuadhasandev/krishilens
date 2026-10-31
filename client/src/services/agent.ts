@@ -1,7 +1,9 @@
 import axios from 'axios'
 import type {
   AgentSessionResponse,
+  InvestigationLanguage,
   StartInvestigationRequest,
+  TranslatedInvestigationText,
 } from '../types/agent'
 
 const api = axios.create({
@@ -10,17 +12,19 @@ const api = axios.create({
 })
 
 function requestError(error: unknown): Error {
-  if (axios.isAxiosError<{ error?: string }>(error)) {
-    if (error.response?.data.error) {
-      return new Error(error.response.data.error)
+  if (axios.isAxiosError<{ errorCode?: string }>(error)) {
+    if (error.response?.data.errorCode) {
+      return new Error(error.response.data.errorCode)
     }
     if (!error.response) {
-      return new Error(
-        'Could not connect to KrishiLens. Check that the backend is running and try again.',
-      )
+      return new Error('NETWORK_ERROR')
     }
   }
-  return new Error('The investigation could not be completed. Please try again.')
+  return new Error('INVESTIGATION_FAILED')
+}
+
+function authHeader(token: string): { headers: { Authorization: string } } {
+  return { headers: { Authorization: 'Bearer ' + token } }
 }
 
 export async function startInvestigation(
@@ -35,7 +39,7 @@ export async function startInvestigation(
         language: request.language,
         question: request.question,
       },
-      { headers: { Authorization: `Bearer ${request.scanAccessToken}` } },
+      authHeader(request.scanAccessToken),
     )
     return response.data
   } catch (error) {
@@ -47,12 +51,30 @@ export async function answerInvestigation(
   sessionId: string,
   accessToken: string,
   answer: string,
+  language: InvestigationLanguage,
 ): Promise<AgentSessionResponse> {
   try {
     const response = await api.post<AgentSessionResponse>(
       `/api/agent/${sessionId}/answer`,
-      { answer },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { answer, language },
+      authHeader(accessToken),
+    )
+    return response.data
+  } catch (error) {
+    throw requestError(error)
+  }
+}
+
+export async function translateInvestigation(
+  sessionId: string,
+  accessToken: string,
+  language: InvestigationLanguage,
+): Promise<TranslatedInvestigationText> {
+  try {
+    const response = await api.post<TranslatedInvestigationText>(
+      `/api/agent/${sessionId}/translate`,
+      { language },
+      authHeader(accessToken),
     )
     return response.data
   } catch (error) {
@@ -67,7 +89,7 @@ export async function getInvestigation(
   try {
     const response = await api.get<AgentSessionResponse>(
       `/api/agent/${sessionId}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      authHeader(accessToken),
     )
     return response.data
   } catch (error) {

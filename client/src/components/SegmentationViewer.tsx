@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 interface SegmentationViewerProps {
   originalUrl: string
   overlayUrl: string | null
@@ -11,14 +13,16 @@ export function SegmentationViewer({
   width,
   height,
 }: SegmentationViewerProps) {
+  const { t } = useTranslation()
+
   return (
-    <section aria-label="Segmentation image comparison" className="grid gap-4 sm:grid-cols-2">
+    <section aria-label={t('imageAnalysis.comparison')} className="grid gap-4 sm:grid-cols-2">
       <figure className="min-w-0">
         <figcaption className="mb-2 text-sm font-semibold text-[#31513b]">
-          Uploaded image
+          {t('imageAnalysis.uploaded')}
         </figcaption>
         <img
-          alt="Uploaded crop image"
+          alt={t('imageAnalysis.uploadedAlt')}
           className="block h-auto max-h-[30rem] w-full rounded-2xl border border-[#e5ebdf] bg-[#f7f8f2] object-contain"
           src={originalUrl}
         />
@@ -26,17 +30,17 @@ export function SegmentationViewer({
 
       <figure className="min-w-0">
         <figcaption className="mb-2 text-sm font-semibold text-[#31513b]">
-          SAM segmentation overlay
+          {t('imageAnalysis.overlay')}
         </figcaption>
         <div className="relative">
           <img
-            alt="Uploaded crop image with segmentation"
+            alt={t('imageAnalysis.overlayAlt')}
             className="block h-auto max-h-[30rem] w-full rounded-2xl border border-[#e5ebdf] bg-[#f7f8f2] object-contain"
             src={originalUrl}
           />
           {overlayUrl && (
             <img
-              alt="Green outline marks the segmented leaf; orange marks the selected candidate region."
+              alt={t('imageAnalysis.overlayAlt')}
               className="absolute inset-0 h-full max-h-[30rem] w-full object-contain"
               src={overlayUrl}
               style={{ aspectRatio: `${width} / ${height}` }}
@@ -44,9 +48,10 @@ export function SegmentationViewer({
           )}
         </div>
         <p className="mt-2 text-xs text-[#7b887e]">
-          <span className="font-semibold text-[#2d9a61]">Green:</span> candidate
-          leaf boundary · <span className="font-semibold text-[#d86b27]">Orange:</span>{' '}
-          selected candidate region
+          <span className="font-semibold text-[#2d9a61]">{t('imageAnalysis.green')}</span>{' '}
+          {t('imageAnalysis.leafBoundary')} ·{' '}
+          <span className="font-semibold text-[#d86b27]">{t('imageAnalysis.orange')}</span>{' '}
+          {t('imageAnalysis.candidateRegion')}
         </p>
       </figure>
     </section>

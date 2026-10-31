@@ -260,6 +260,8 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
   const scan = createScan(scans)
   const sessions = new InMemorySessionStore()
   const session = createTestSession(sessions, scan.id)
+  session.language = 'bn'
+  session.farmerQuestion = 'আমার ধানের পাতায় দাগ দেখা যাচ্ছে।'
   let turn = 0
   const requests: OpenAI.Responses.ResponseCreateParamsNonStreaming[] = []
 
@@ -275,8 +277,8 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
           toolCall(
             'ask_farmer',
             {
-              question: 'Are nearby plants showing similar spots?',
-              why: 'A pattern across nearby plants is useful context.',
+              question: 'পাশের গাছেও কি একই দাগ দেখা যাচ্ছে?',
+              why: 'পাশের গাছের লক্ষণ জানলে বিস্তার বোঝা যায়।',
             },
             'ask-call',
           ),
@@ -288,6 +290,14 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
           'finalize_report',
           {
             report: reportDraft(session.id, {
+              language: 'bn',
+              summary: 'স্ক্যানটি রোগ শনাক্ত করতে পারে না।',
+              missingInformation: ['দাগ কবে শুরু হয়েছে?'],
+              safeNextSteps: ['পাতার ছবি তুলে রাখুন।'],
+              escalationRecommendation: {
+                recommended: true,
+                reason: 'স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন।',
+              },
               citationIds: ['brri-official-portal'],
             }),
           },
@@ -300,7 +310,7 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
   assert.equal(session.status, 'awaiting_farmer')
   session.pendingFunctionOutputs.push({
     role: 'user',
-    content: 'Farmer answer: two nearby plants also show spots.',
+    content: 'কৃষকের উত্তর: পাশের দুটি গাছেও দাগ দেখা যাচ্ছে।',
   })
   session.answerCount += 1
   session.pendingQuestion = undefined
@@ -315,6 +325,14 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
           'finalize_report',
           {
             report: reportDraft(session.id, {
+              language: 'bn',
+              summary: 'স্ক্যানটি রোগ শনাক্ত করতে পারে না।',
+              missingInformation: ['দাগ কবে শুরু হয়েছে?'],
+              safeNextSteps: ['পাতার ছবি তুলে রাখুন।'],
+              escalationRecommendation: {
+                recommended: true,
+                reason: 'স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন।',
+              },
               citationIds: ['brri-official-portal'],
             }),
           },
@@ -325,6 +343,9 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
   })
 
   assert.equal(session.status, 'escalated')
+  assert.equal(session.language, 'bn')
+  assert.equal(session.report?.language, 'bn')
+  assert.equal(session.report?.summary, 'স্ক্যানটি রোগ শনাক্ত করতে পারে না।')
   assert.equal(session.report?.citations[0]?.sourceId, 'brri-official-portal')
   assert.equal(
     session.report?.segmentationMeasurementQuality.percentage,
@@ -339,7 +360,7 @@ test('agent pauses for one follow-up and resumes with the farmer answer', async 
       (item) =>
         'role' in item &&
         item.role === 'user' &&
-        JSON.stringify(item).includes('two nearby plants'),
+        JSON.stringify(item).includes('পাশের দুটি গাছ'),
     ),
   )
 })

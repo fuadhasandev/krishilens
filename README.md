@@ -6,7 +6,7 @@ The project includes a text-only Muse Spark preview, SAM 3.1 image segmentation,
 
 ## Technology stack
 
-- **Frontend:** React, Vite, TypeScript, Tailwind CSS (official Vite plugin), React Router, Axios, Lucide React
+- **Frontend:** React, Vite, TypeScript, Tailwind CSS (official Vite plugin), React Router, Axios, Lucide React, i18next, react-i18next
 - **Backend:** Node.js, Express, TypeScript, `tsx`, dotenv, Zod, OpenAI SDK (Meta Responses API), Multer, Sharp
 - **SAM parsing:** `@meta-sam/parser` for streamed segmentation records and binary masks
 - **Planned data:** MongoDB, Mongoose; Zod validates API requests
@@ -68,6 +68,8 @@ Run these from the repository root:
 | `npm run build` | Build the frontend and compile the backend |
 | `npm run typecheck` | Check both TypeScript projects (the client check also produces its production build) |
 | `npm test` | Run backend agent, upload, parser, mask-math, and provider error tests |
+| `npm run test --prefix client` | Run bilingual UI, locale parity, persistence, and request-language tests |
+| `npm run lint --prefix client` | Lint the frontend |
 | `npm run dev --prefix client` | Run only the frontend |
 | `npm run dev --prefix server` | Run only the backend |
 | `npm run typecheck --prefix server` | Type-check the backend |
@@ -83,6 +85,7 @@ Send `multipart/form-data` with:
 | `image` | Yes | JPEG, PNG, or WebP; maximum 5 MB |
 | `crop` | No | `rice` (default), `wheat`, `maize`, `jute`, `other` |
 | `target` | No | `brown spots` (default), `yellow discolored region`, `damaged leaf region` |
+| `language` | No | `bn` (default) or `en`; included with browser requests |
 
 Example:
 
@@ -95,7 +98,7 @@ curl -X POST http://localhost:3000/api/images/segment \
 
 The backend validates and decodes the uploaded image, auto-rotates it, and resizes it to at most 2048 × 2048 while preserving aspect ratio. It first sends the selected crop leaf as a short SAM concept. If that prompt returns no matches, it tries the generic noun phrase `leaf`. When a leaf is found, the selected candidate region is sent in a separate request. These are sequential, one-concept-per-request SAM Responses API calls. The image is held in memory and sent as a data URL; no image files or public upload URLs are stored.
 
-The JSON response includes `success`, `model`, normalized `image` dimensions, leaf-mask status and pixel count, candidate affected pixel count/percentage/status, detected `objects`, a transparent PNG `overlay.imageUrl`, provider `requestIds`, and short-lived `scanId`/`scanAccessToken` values for an investigation. Keep the access token private; the browser holds it in memory and sends it only in an `Authorization: Bearer` header. The percentage is computed only when validated leaf and candidate masks are available; it is the candidate mask intersection with the leaf mask divided by leaf-mask pixels. This is a geometric estimate of model-selected pixels only, **not** a disease diagnosis or validated severity measure. Missing, invalid, or disjoint masks produce no estimate rather than a zero-damage claim. Overlay green outlines mark the leaf mask; orange pixels show the candidate mask, including portions outside the leaf.
+The JSON response includes `success`, `model`, normalized `image` dimensions, leaf-mask status and pixel count, candidate affected pixel count/percentage/status, detected `objects`, a transparent PNG `overlay.imageUrl`, provider `requestIds`, and short-lived `scanId`/`scanAccessToken` values for an investigation. Keep the access token private; the browser holds it in memory and sends it only in an `Authorization: Bearer` header. The percentage is computed only when validated leaf and candidate masks are available; it is the candidate mask intersection with the leaf mask divided by leaf-mask pixels. This is a geometric estimate of model-selected pixels only, **not** a disease diagnosis or validated severity measure. Missing, invalid, or disjoint masks produce no estimate rather than a zero-damage claim. Overlay green outlines mark the leaf mask; orange pixels show the candidate mask, including portions outside the leaf. The selected interface language is sent as `language`; API status and error codes remain language-neutral.
 
 The endpoint returns 400 for missing/invalid uploads, 413 for files larger than 5 MB, 503 when the model key is unavailable, 429 for provider rate limits, 504 for timeouts, and 502 for other provider failures. Error responses include a friendly `error` and do not expose upstream stack traces or credentials.
 
@@ -147,7 +150,11 @@ Content-Type: application/json
 }
 ```
 
-The response contains `sessionId`, `accessToken`, `status`, a sanitized `trace`, and either a `pendingQuestion`, a final `report`, or a friendly status `message`. Use the session token in an `Authorization: Bearer` header for both `GET /api/agent/:sessionId` and `POST /api/agent/:sessionId/answer`; the answer body is `{ "answer": "..." }`. Never put either access token in a URL or log. Investigation reads are marked `Cache-Control: no-store`.
+The response contains `sessionId`, the original session `language`, `accessToken`, `status`, a sanitized `trace`, and either a `pendingQuestion`, a final `report`, or a status `message`. Use the session token in an `Authorization: Bearer` header for `GET /api/agent/:sessionId`, `POST /api/agent/:sessionId/answer`, and `POST /api/agent/:sessionId/translate`. Follow-up answers may include the original `{ "language": "bn" | "en" }`; the server checks it and keeps that language for the entire investigation. Translation accepts `{ "language": "bn" | "en" }` and returns a separate translated report/question; it does not overwrite the original case text, observations, measurements, or citations. The UI identifies the original language and only displays translated agent text after the explicit translation action. Never put either access token in a URL or log. Investigation reads are marked `Cache-Control: no-store`.
+
+## Languages
+
+The interface defaults to Bangla (`bn`) for new users and restores only a valid `bn`/`en` preference from `localStorage` (`krishilens.language`). Switching language updates visible static text, document language/title, accessibility labels, and localized number formatting without reloading or resetting the current route or form state. Static copy is bundled in `client/src/i18n/locales/`; it is not machine-translated at runtime. Muse Spark generates investigation content in the language selected when a case starts. If the interface language changes during a case, use the explicit translation action; the original report remains unchanged. Translation output is schema-checked and numeric values/IDs/citations are preserved, but machine translation may still be imperfect.
 
 The agent uses the Meta Responses API function-calling protocol (`function_call`, matching `function_call_output` items, and `previous_response_id`). The server validates tool names, arguments, and outputs; runs a maximum of six model turns; blocks repeated tool calls without new farmer information; and pauses at one follow-up question until an answer arrives. Deterministic report checks reject un-retrieved citations, unsupported percentages, non-agronomic sources used as disease evidence, and chemical treatment instructions. Trace entries report actions only and never include hidden model reasoning or farmer answers.
 

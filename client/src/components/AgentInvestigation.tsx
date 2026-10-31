@@ -1,9 +1,16 @@
 import { useState } from 'react'
 import { LoaderCircle, Search } from 'lucide-react'
-import { answerInvestigation, startInvestigation } from '../services/agent'
+import { useTranslation } from 'react-i18next'
+import { currentLanguage } from '../i18n'
+import {
+  answerInvestigation,
+  startInvestigation,
+  translateInvestigation,
+} from '../services/agent'
 import type {
   AgentSessionResponse,
   InvestigationLanguage,
+  TranslatedInvestigationText,
 } from '../types/agent'
 import type { Crop } from '../types/cropAnalysis'
 import { FarmerQuestion } from './FarmerQuestion'
@@ -22,15 +29,32 @@ export function AgentInvestigation({
   scanAccessToken,
   crop,
 }: AgentInvestigationProps) {
-  const [language, setLanguage] = useState<InvestigationLanguage>('bn')
+  const { t } = useTranslation()
   const [session, setSession] = useState<AgentSessionResponse | null>(null)
   const [accessToken, setAccessToken] = useState('')
-  const [error, setError] = useState('')
+  const [translation, setTranslation] =
+    useState<TranslatedInvestigationText | null>(null)
+  const [errorCode, setErrorCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [translating, setTranslating] = useState(false)
+
+  const displayLanguage: InvestigationLanguage = currentLanguage()
+  const sessionLanguage = session?.language ?? displayLanguage
+  const report =
+    session?.report?.language === displayLanguage
+      ? session.report
+      : translation?.report?.language === displayLanguage
+        ? translation.report
+        : session?.report
+  const pendingQuestion =
+    translation?.pendingQuestion && displayLanguage !== sessionLanguage
+      ? translation.pendingQuestion
+      : session?.pendingQuestion
 
   async function handleStart(farmerQuestion: string): Promise<boolean> {
+    const language = currentLanguage()
     setLoading(true)
-    setError('')
+    setErrorCode('')
     try {
       const result = await startInvestigation({
         scanId,
@@ -41,13 +65,10 @@ export function AgentInvestigation({
       })
       setSession(result)
       setAccessToken(result.accessToken ?? '')
+      setTranslation(null)
       return true
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'The investigation could not be started. Please try again.',
-      )
+      setErrorCode(requestError instanceof Error ? requestError.message : 'INVESTIGATION_FAILED')
       return false
     } finally {
       setLoading(false)
@@ -59,63 +80,77 @@ export function AgentInvestigation({
       return false
     }
     setLoading(true)
-    setError('')
+    setErrorCode('')
     try {
       setSession(
-        await answerInvestigation(session.sessionId, accessToken, answer),
+        await answerInvestigation(
+          session.sessionId,
+          accessToken,
+          answer,
+          session.language,
+        ),
       )
+      setTranslation(null)
       return true
     } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Your answer could not be submitted. Please try again.',
-      )
+      setErrorCode(requestError instanceof Error ? requestError.message : 'INVESTIGATION_FAILED')
       return false
     } finally {
       setLoading(false)
     }
   }
 
+  async function handleTranslate() {
+    if (!session || !accessToken) {
+      return
+    }
+    setTranslating(true)
+    setErrorCode('')
+    try {
+      setTranslation(
+        await translateInvestigation(
+          session.sessionId,
+          accessToken,
+          displayLanguage,
+        ),
+      )
+    } catch (translationError) {
+      setErrorCode(
+        translationError instanceof Error
+          ? translationError.message
+          : 'TRANSLATION_FAILED',
+      )
+    } finally {
+      setTranslating(false)
+    }
+  }
+
+  const otherLanguage =
+    sessionLanguage === 'bn' ? 'common.bangla' : 'common.english'
+  const targetLanguage =
+    displayLanguage === 'bn' ? 'common.bangla' : 'common.english'
+
   return (
     <section className="space-y-5 border-t border-[#e5ebdf] pt-6">
       <div>
         <p className="text-sm font-semibold text-[#4c8456]">
-          {language === 'bn' ? 'প্রমাণভিত্তিক তদন্ত' : 'Evidence-led investigation'}
+          {t('investigation.eyebrow')}
         </p>
         <h2 className="mt-1 text-xl font-semibold text-[#183b2c] sm:text-2xl">
-          {language === 'bn' ? 'আপনার পর্যবেক্ষণ অনুসন্ধান করুন' : 'Investigate your observations'}
+          {t('investigation.title')}
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#617166]">
-          {language === 'bn'
-            ? 'এজেন্টটি আসল স্ক্যান পর্যবেক্ষণ ও সূত্র ব্যবহার করবে, প্রয়োজন হলে একটি প্রশ্ন করবে এবং অনিশ্চয়তা স্পষ্ট করবে।'
-            : 'The agent uses actual scan observations and retrieved references, asks a follow-up when useful, and makes uncertainty clear.'}
+          {t('investigation.intro')}
         </p>
       </div>
 
       {!session && (
-        <div className="space-y-4">
-          <label className="block text-sm font-medium text-[#31513b]">
-            {language === 'bn' ? 'উত্তরের ভাষা' : 'Response language'}
-            <select
-              className="mt-2 min-h-11 w-full rounded-xl border border-[#dce6d6] bg-[#fbfcf9] px-3 text-base outline-none focus:border-[#4c8456] focus:ring-2 focus:ring-[#4c8456]/20 sm:w-auto sm:min-w-48"
-              onChange={(event) =>
-                setLanguage(event.target.value as InvestigationLanguage)
-              }
-              value={language}
-            >
-              <option value="bn">বাংলা / Bangla</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <FarmerQuestion
-            language={language}
-            loading={loading}
-            mode="start"
-            onSubmit={handleStart}
-            title={language === 'bn' ? 'আপনি কী জানতে চান?' : 'What would you like to investigate?'}
-          />
-        </div>
+        <FarmerQuestion
+          loading={loading}
+          mode="start"
+          onSubmit={handleStart}
+          title={t('investigation.askTitle')}
+        />
       )}
 
       {loading && (
@@ -125,17 +160,17 @@ export function AgentInvestigation({
           role="status"
         >
           <LoaderCircle aria-hidden="true" className="animate-spin" size={18} />
-          {language === 'bn' ? 'প্রমাণ যাচাই করে তদন্ত চলছে…' : 'Investigating with evidence…'}
+          {t('investigation.loading')}
         </div>
       )}
 
-      {error && (
+      {errorCode && (
         <p
           aria-live="polite"
           className="rounded-xl border border-[#f1d4cd] bg-[#fff7f4] p-4 text-sm leading-6 text-[#854735]"
           role="alert"
         >
-          {error}
+          {t(`errors.${errorCode}`, { defaultValue: t('errors.INVESTIGATION_FAILED') })}
         </p>
       )}
 
@@ -144,28 +179,58 @@ export function AgentInvestigation({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <InvestigationStatusBadge status={session.status} />
             <span className="text-xs text-[#7b887e]">
-              {language === 'bn' ? 'কেস' : 'Case'} {session.sessionId.slice(0, 8)}
+              {t('investigation.case')} {session.sessionId.slice(0, 8)} ·{' '}
+              {t(otherLanguage)}
             </span>
           </div>
 
-          {session.status === 'awaiting_farmer' && session.pendingQuestion && (
+          {displayLanguage !== sessionLanguage &&
+            (session.report || session.pendingQuestion) && (
+            <div className="space-y-3 rounded-xl border border-[#eee2bd] bg-[#fffaf0] p-4 text-sm leading-6 text-[#705c2f]">
+              <p>{t('investigation.sessionLanguageNote', { language: t(otherLanguage) })}</p>
+              <button
+                className="inline-flex min-h-10 items-center justify-center rounded-lg border border-[#d8c98f] bg-white px-3 py-2 font-semibold text-[#574817] disabled:opacity-60"
+                disabled={translating || loading}
+                onClick={handleTranslate}
+                type="button"
+              >
+                {translating ? (
+                  <>
+                    <LoaderCircle aria-hidden="true" className="mr-2 animate-spin" size={16} />
+                    {t('investigation.translating')}
+                  </>
+                ) : (
+                  t(
+                    session.report
+                      ? 'investigation.translateReport'
+                      : 'investigation.translateQuestion',
+                    { language: t(targetLanguage) },
+                  )
+                  )}
+              </button>
+              {translation?.report && displayLanguage === translation.report.language && (
+                <p>{t('investigation.translationNote')}</p>
+              )}
+            </div>
+          )}
+
+          {session.status === 'awaiting_farmer' && pendingQuestion && (
             <FarmerQuestion
-              language={language}
               loading={loading}
               mode="answer"
               onSubmit={handleAnswer}
-              prompt={session.pendingQuestion}
-              title={language === 'bn' ? 'আরও একটি তথ্য প্রয়োজন' : 'A little more information is needed'}
+              prompt={pendingQuestion}
+              title={t('investigation.moreInfo')}
             />
           )}
 
-          {session.message && (
-            <p className="rounded-xl border border-[#f1dfaa] bg-[#fff9e9] p-4 text-sm leading-6 text-[#755a16]">
-              {session.message}
+          {session.status === 'failed' && (
+            <p className="rounded-xl border border-[#f1d4cd] bg-[#fff7f4] p-4 text-sm leading-6 text-[#854735]">
+              {t('errors.INVESTIGATION_FAILED')}
             </p>
           )}
 
-          {session.report && <InvestigationReport report={session.report} />}
+          {report && <InvestigationReport report={report} />}
           <InvestigationTrace trace={session.trace} />
         </div>
       )}
@@ -173,9 +238,7 @@ export function AgentInvestigation({
       {!session && !loading && (
         <div className="flex items-center gap-2 text-xs text-[#7b887e]">
           <Search aria-hidden="true" size={14} />
-          {language === 'bn'
-            ? 'এটি একটি তদন্ত সহায়তা, নিশ্চিত রোগ নির্ণয় নয়।'
-            : 'This is an investigation aid, not a confirmed diagnosis.'}
+          {t('investigation.disclaimer')}
         </div>
       )}
     </section>

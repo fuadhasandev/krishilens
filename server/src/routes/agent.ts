@@ -6,6 +6,7 @@ import { sessionStore } from '../agent/sessionStore.js'
 import { TemporaryStoreCapacityError } from '../agent/storeErrors.js'
 import type { AgentSession } from '../agent/types.js'
 import { cropSchema, languageSchema } from '../agent/types.js'
+import { translateInvestigationText } from '../services/reportTranslation.js'
 
 const investigateSchema = z
   .object({
@@ -17,8 +18,12 @@ const investigateSchema = z
   .strict()
 
 const answerSchema = z
-  .object({ answer: z.string().trim().min(1).max(2000) })
+  .object({
+    answer: z.string().trim().min(1).max(2000),
+    language: languageSchema.optional(),
+  })
   .strict()
+const translateSchema = z.object({ language: languageSchema }).strict()
 
 const activeSessions = new Set<string>()
 export const agentRouter = Router()
@@ -35,6 +40,7 @@ function bearerToken(authorization: string | undefined): string | null {
 function publicSession(session: AgentSession) {
   return {
     sessionId: session.id,
+    language: session.language,
     status: session.status,
     ...(session.pendingQuestion
       ? { pendingQuestion: { question: session.pendingQuestion.question, why: session.pendingQuestion.why } }
@@ -54,11 +60,111 @@ function publicSession(session: AgentSession) {
   }
 }
 
+agentRouter.post('/agent/:sessionId/translate', async (request, response) => {
+  const sessionIdParsed = z.string().uuid().safeParse(request.params.sessionId)
+  const translationParsed = translateSchema.safeParse(request.body)
+  if (!sessionIdParsed.success || !translationParsed.success) {
+    response.status(400).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'Provide a valid investigation ID and target language.',
+    })
+    return
+  }
+
+  const token = bearerToken(request.get('authorization'))
+  if (!token) {
+    response.status(401).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'A valid investigation access token is required.',
+    })
+    return
+  }
+
+  const session = sessionStore.getAuthorized(sessionIdParsed.data, token)
+  if (!session) {
+    response.status(404).json({
+      success: false,
+      errorCode: 'SESSION_EXPIRED',
+      error: 'This investigation is unavailable or its access token is invalid.',
+    })
+    return
+  }
+  if (activeSessions.has(session.id)) {
+    response.status(409).json({
+      success: false,
+      errorCode: 'ALREADY_PROCESSING',
+      error: 'This investigation is already processing a request.',
+    })
+    return
+  }
+  if (translationParsed.data.language === session.language) {
+    response.status(400).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'Choose the investigation language as the translation target.',
+    })
+    return
+  }
+  if (!session.report && !session.pendingQuestion) {
+    response.status(409).json({
+      success: false,
+      errorCode: 'TRANSLATION_FAILED',
+      error: 'There is no investigation text available to translate.',
+    })
+    return
+  }
+
+  try {
+    activeSessions.add(session.id)
+    const translated = await translateInvestigationText(
+      session.report ?? {
+        caseId: session.id,
+        cropType: session.crop,
+        language: session.language,
+        summary: '',
+        visibleObservations: [],
+        possibleCauses: [],
+        missingInformation: [],
+        safeNextSteps: [],
+        citations: [],
+        evidenceStatus: 'insufficient_evidence',
+        escalationRecommendation: { recommended: false, reason: '' },
+        segmentationMeasurementQuality: {
+          status: 'unavailable',
+          leafPixelCount: null,
+          affectedPixelCount: null,
+          percentage: null,
+        },
+      },
+      translationParsed.data.language,
+      session.pendingQuestion,
+    )
+    response.json({
+      success: true,
+      ...(session.report ? { report: translated.report } : {}),
+      ...(translated.pendingQuestion
+        ? { pendingQuestion: translated.pendingQuestion }
+        : {}),
+    })
+  } catch {
+    response.status(502).json({
+      success: false,
+      errorCode: 'TRANSLATION_FAILED',
+      error: 'The investigation text could not be translated.',
+    })
+  } finally {
+    activeSessions.delete(session.id)
+  }
+})
+
 agentRouter.post('/agent/investigate', async (request, response) => {
   const parsed = investigateSchema.safeParse(request.body)
   if (!parsed.success) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'Provide a valid scan ID, supported crop and language, and a question.',
     })
     return
@@ -68,6 +174,7 @@ agentRouter.post('/agent/investigate', async (request, response) => {
   if (!scanToken) {
     response.status(401).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'A valid scan access token is required.',
     })
     return
@@ -77,6 +184,7 @@ agentRouter.post('/agent/investigate', async (request, response) => {
   if (!scan) {
     response.status(404).json({
       success: false,
+      errorCode: 'SESSION_EXPIRED',
       error: 'This scan is unavailable or its access token is invalid.',
     })
     return
@@ -84,6 +192,7 @@ agentRouter.post('/agent/investigate', async (request, response) => {
   if (scan.crop !== parsed.data.crop) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'The selected crop does not match the analyzed scan.',
     })
     return
@@ -108,6 +217,7 @@ agentRouter.post('/agent/investigate', async (request, response) => {
     if (error instanceof TemporaryStoreCapacityError) {
       response.status(503).json({
         success: false,
+        errorCode: 'STORAGE_BUSY',
         error: 'Temporary investigation storage is busy. Please try again later.',
       })
       return
@@ -137,6 +247,7 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   if (!sessionIdParsed.success || !answerParsed.success) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'Provide a valid investigation ID and a non-empty answer.',
     })
     return
@@ -146,6 +257,7 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   if (!token) {
     response.status(401).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'A valid investigation access token is required.',
     })
     return
@@ -155,6 +267,7 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   if (!session) {
     response.status(404).json({
       success: false,
+      errorCode: 'SESSION_EXPIRED',
       error: 'This investigation is unavailable or its access token is invalid.',
     })
     return
@@ -162,6 +275,7 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   if (activeSessions.has(session.id)) {
     response.status(409).json({
       success: false,
+      errorCode: 'ALREADY_PROCESSING',
       error: 'This investigation is already processing a request.',
     })
     return
@@ -169,7 +283,16 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   if (session.status !== 'awaiting_farmer' || !session.pendingQuestion) {
     response.status(409).json({
       success: false,
+      errorCode: 'NOT_WAITING',
       error: 'This investigation is not waiting for a farmer answer.',
+    })
+    return
+  }
+  if (answerParsed.data.language && answerParsed.data.language !== session.language) {
+    response.status(400).json({
+      success: false,
+      errorCode: 'INVALID_REQUEST',
+      error: 'The response language must match the investigation language.',
     })
     return
   }
@@ -199,6 +322,7 @@ agentRouter.get('/agent/:sessionId', (request, response) => {
   if (!sessionIdParsed.success) {
     response.status(404).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'This investigation is unavailable.',
     })
     return
@@ -208,6 +332,7 @@ agentRouter.get('/agent/:sessionId', (request, response) => {
   if (!token) {
     response.status(401).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'A valid investigation access token is required.',
     })
     return
@@ -217,6 +342,7 @@ agentRouter.get('/agent/:sessionId', (request, response) => {
   if (!session) {
     response.status(404).json({
       success: false,
+      errorCode: 'SESSION_EXPIRED',
       error: 'This investigation is unavailable or its access token is invalid.',
     })
     return

@@ -44,10 +44,14 @@ async function postImage(
   buffer?: Buffer,
   filename = 'crop.png',
   mimeType = 'image/png',
+  fields: Record<string, string> = {},
 ): Promise<Response> {
   const form = new FormData()
   if (buffer) {
     form.append('image', new Blob([buffer], { type: mimeType }), filename)
+  }
+  for (const [name, value] of Object.entries(fields)) {
+    form.append(name, value)
   }
   return fetch(`${baseUrl}/api/images/segment`, {
     method: 'POST',
@@ -125,11 +129,15 @@ test('returns 400 when the multipart image is missing', async () => {
   assert.match((await response.json()).error, /select/i)
 })
 
-test('accepts a valid upload before safely reporting missing model credentials', async () => {
+test('accepts the language field before safely reporting missing model credentials', async () => {
   const originalKey = process.env.MODEL_API_KEY
   delete process.env.MODEL_API_KEY
   try {
-    const response = await postImage(await createPng())
+    const response = await postImage(await createPng(), 'crop.png', 'image/png', {
+      crop: 'rice',
+      target: 'brown spots',
+      language: 'en',
+    })
     assert.equal(response.status, 503)
     assert.match((await response.json()).error, /not configured/i)
   } finally {

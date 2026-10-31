@@ -9,13 +9,21 @@ const api = axios.create({
   timeout: 190_000,
 })
 
-export async function analyzeImage(
+export function createImageAnalysisFormData(
   request: ImageAnalysisRequest,
-): Promise<ImageAnalysisResponse> {
+): FormData {
   const formData = new FormData()
   formData.append('image', request.image)
   formData.append('crop', request.crop)
   formData.append('target', request.target)
+  formData.append('language', request.language)
+  return formData
+}
+
+export async function analyzeImage(
+  request: ImageAnalysisRequest,
+): Promise<ImageAnalysisResponse> {
+  const formData = createImageAnalysisFormData(request)
 
   try {
     const response = await api.post<ImageAnalysisResponse>(
@@ -24,17 +32,15 @@ export async function analyzeImage(
     )
     return response.data
   } catch (error) {
-    if (axios.isAxiosError<{ error?: string }>(error)) {
-      if (error.response?.data.error) {
-        throw new Error(error.response.data.error)
+    if (axios.isAxiosError<{ errorCode?: string }>(error)) {
+      if (error.response?.data.errorCode) {
+        throw new Error(error.response.data.errorCode)
       }
       if (!error.response) {
-        throw new Error(
-          'Could not connect to KrishiLens. Check that the backend is running and try again.',
-        )
+        throw new Error('NETWORK_ERROR')
       }
     }
 
-    throw new Error('Image analysis could not be completed. Please try again.')
+    throw new Error('UPLOAD_FAILED')
   }
 }

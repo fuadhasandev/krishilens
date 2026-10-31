@@ -1,11 +1,19 @@
 import type { InvestigationStatus } from '../types/agent'
+import { useTranslation } from 'react-i18next'
 
-const statusLabels: Record<InvestigationStatus, string> = {
-  investigating: 'Investigating',
-  awaiting_farmer: 'Waiting for your answer',
-  completed: 'Investigation complete',
-  escalated: 'Needs local expert support',
-  failed: 'Investigation paused',
+const statusKeys: Record<
+  InvestigationStatus,
+  | 'investigation.status.investigating'
+  | 'investigation.status.awaitingFarmer'
+  | 'investigation.status.completed'
+  | 'investigation.status.escalated'
+  | 'investigation.status.failed'
+> = {
+  investigating: 'investigation.status.investigating',
+  awaiting_farmer: 'investigation.status.awaitingFarmer',
+  completed: 'investigation.status.completed',
+  escalated: 'investigation.status.escalated',
+  failed: 'investigation.status.failed',
 }
 
 const statusStyles: Record<InvestigationStatus, string> = {
@@ -21,12 +29,14 @@ export function InvestigationStatusBadge({
 }: {
   status: InvestigationStatus
 }) {
+  const { t } = useTranslation()
+
   return (
     <span
       aria-live="polite"
       className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${statusStyles[status]}`}
     >
-      {statusLabels[status]}
+      {t(statusKeys[status])}
     </span>
   )
 }

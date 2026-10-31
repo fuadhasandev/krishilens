@@ -19,16 +19,14 @@ export async function analyzeCrop(
     )
     return response.data
   } catch (error) {
-    if (axios.isAxiosError<CropAnalysisResponse>(error)) {
-      const message = error.response?.data?.answer
-      if (message) {
-        throw new Error(message)
+    if (axios.isAxiosError<{ errorCode?: string }>(error)) {
+      const code = error.response?.data?.errorCode
+      if (code) {
+        throw new Error(code)
       }
 
       if (!error.response) {
-        throw new Error(
-          'Could not connect to KrishiLens. Check that the backend is running and try again.',
-        )
+        throw new Error('NETWORK_ERROR')
       }
     }
 
@@ -36,6 +34,6 @@ export async function analyzeCrop(
       throw error
     }
 
-    throw new Error('Something went wrong. Please try again.')
+    throw new Error('ANALYSIS_FAILED')
   }
 }

@@ -1,32 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Image as ImageIcon, LoaderCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { DamageResult } from '../components/DamageResult'
 import { AgentInvestigation } from '../components/AgentInvestigation'
 import { ImageUploader } from '../components/ImageUploader'
+import { LanguageSwitcher } from '../components/LanguageSwitcher'
 import { SegmentationViewer } from '../components/SegmentationViewer'
 import { analyzeImage } from '../services/imageAnalysis'
+import { currentLanguage } from '../i18n'
 import type { Crop } from '../types/cropAnalysis'
 import type {
   ImageAnalysisResponse,
   SegmentationTarget,
 } from '../types/imageAnalysis'
 
-const crops: { value: Crop; label: string }[] = [
-  { value: 'rice', label: 'Rice' },
-  { value: 'wheat', label: 'Wheat' },
-  { value: 'maize', label: 'Maize' },
-  { value: 'jute', label: 'Jute' },
-  { value: 'other', label: 'Other' },
-]
+const crops: Crop[] = ['rice', 'wheat', 'maize', 'jute', 'other']
 
-const targets: { value: SegmentationTarget; label: string }[] = [
-  { value: 'brown spots', label: 'Brown spots' },
-  { value: 'yellow discolored region', label: 'Yellow discolored region' },
-  { value: 'damaged leaf region', label: 'Damaged leaf region' },
+const targets: {
+  value: SegmentationTarget
+  labelKey:
+    | 'imageAnalysis.brownSpots'
+    | 'imageAnalysis.yellowRegion'
+    | 'imageAnalysis.damagedRegion'
+}[] = [
+  { value: 'brown spots', labelKey: 'imageAnalysis.brownSpots' },
+  { value: 'yellow discolored region', labelKey: 'imageAnalysis.yellowRegion' },
+  { value: 'damaged leaf region', labelKey: 'imageAnalysis.damagedRegion' },
 ]
 
 export function ImageAnalysis() {
+  const { t } = useTranslation()
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState('')
@@ -45,7 +49,7 @@ export function ImageAnalysis() {
     }
   }, [])
 
-  function handleImageChange(nextImage: File | null, error = '') {
+  function handleImageChange(nextImage: File | null, errorCode = '') {
     if (previewRef.current) {
       URL.revokeObjectURL(previewRef.current)
     }
@@ -53,7 +57,7 @@ export function ImageAnalysis() {
     previewRef.current = nextPreviewUrl
     setPreviewUrl(nextPreviewUrl)
     setImage(nextImage)
-    setUploadError(error)
+    setUploadError(errorCode)
     setRequestError('')
     setResult(null)
   }
@@ -67,13 +71,10 @@ export function ImageAnalysis() {
     setResult(null)
 
     try {
-      setResult(await analyzeImage({ image, crop, target }))
+      setResult(await analyzeImage({ image, crop, target, language: currentLanguage() }))
     } catch (error) {
-      setRequestError(
-        error instanceof Error
-          ? error.message
-          : 'Image analysis could not be completed. Please try again.',
-      )
+      const code = error instanceof Error ? error.message : 'UPLOAD_FAILED'
+      setRequestError(code)
     } finally {
       setIsLoading(false)
     }
@@ -83,7 +84,7 @@ export function ImageAnalysis() {
     <main className="min-h-screen bg-[#f7f8f2] text-[#183b2c]">
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-5 sm:px-8">
         <Link
-          aria-label="Back to KrishiLens home"
+          aria-label={t('navigation.backHome')}
           className="flex items-center gap-2 text-lg font-bold tracking-tight"
           to="/"
         >
@@ -91,22 +92,21 @@ export function ImageAnalysis() {
           KrishiLens
         </Link>
         <span className="rounded-full border border-[#dce6d6] bg-white/70 px-3 py-1.5 text-xs font-medium text-[#55705d] sm:text-sm">
-          SAM image segmentation
+          {t('imageAnalysis.model')}
         </span>
+        <LanguageSwitcher />
       </header>
 
       <section className="mx-auto w-full max-w-5xl px-5 pb-16 sm:px-8">
         <div className="mb-6">
           <p className="text-sm font-semibold text-[#4c8456]">
-            Visual investigation · No disease diagnosis
+            {t('imageAnalysis.eyebrow')}
           </p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Segment a crop image
+            {t('imageAnalysis.title')}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[#617166] sm:text-base">
-            Upload or capture a crop image. SAM 3.1 will separately look for the
-            crop leaf and the selected visual region. Candidate discoloration is
-            not necessarily crop damage or disease.
+            {t('imageAnalysis.intro')}
           </p>
         </div>
 
@@ -120,22 +120,22 @@ export function ImageAnalysis() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-medium text-[#31513b]">
-              Crop
+              {t('common.crop')}
               <select
                 className="mt-2 min-h-12 w-full rounded-xl border border-[#dce6d6] bg-[#fbfcf9] px-3 text-base outline-none focus:border-[#4c8456] focus:ring-2 focus:ring-[#4c8456]/20"
                 onChange={(event) => setCrop(event.target.value as Crop)}
                 value={crop}
               >
-                {crops.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
+                {crops.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`common.${value}`)}
                   </option>
                 ))}
               </select>
             </label>
 
             <label className="block text-sm font-medium text-[#31513b]">
-              Candidate visual region
+              {t('imageAnalysis.target')}
               <select
                 className="mt-2 min-h-12 w-full rounded-xl border border-[#dce6d6] bg-[#fbfcf9] px-3 text-base outline-none focus:border-[#4c8456] focus:ring-2 focus:ring-[#4c8456]/20"
                 onChange={(event) =>
@@ -145,7 +145,7 @@ export function ImageAnalysis() {
               >
                 {targets.map((item) => (
                   <option key={item.value} value={item.value}>
-                    {item.label}
+                    {t(item.labelKey)}
                   </option>
                 ))}
               </select>
@@ -165,12 +165,12 @@ export function ImageAnalysis() {
                   className="animate-spin"
                   size={18}
                 />
-                Segmenting image…
+                {t('imageAnalysis.segmenting')}
               </>
             ) : (
               <>
                 <ImageIcon aria-hidden="true" size={18} />
-                Analyze Image
+                {t('imageAnalysis.analyze')}
               </>
             )}
           </button>
@@ -181,7 +181,7 @@ export function ImageAnalysis() {
               className="rounded-xl border border-[#f1d4cd] bg-[#fff7f4] p-4 text-sm leading-6 text-[#854735]"
               role="alert"
             >
-              {requestError}
+              {t(`errors.${requestError}`, { defaultValue: t('errors.UPLOAD_FAILED') })}
             </p>
           )}
 
@@ -207,9 +207,9 @@ export function ImageAnalysis() {
         </div>
 
         <p className="mt-5 text-center text-sm text-[#7b887e]">
-          Want to describe what you’ve seen instead?{' '}
+          {t('imageAnalysis.describeInstead')}{' '}
           <Link className="font-semibold text-[#326548] underline" to="/">
-            Ask KrishiLens in text
+            {t('imageAnalysis.askText')}
           </Link>
         </p>
       </section>

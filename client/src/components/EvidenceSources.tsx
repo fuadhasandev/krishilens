@@ -1,22 +1,19 @@
 import type { InvestigationReport } from '../types/agent'
+import { useTranslation } from 'react-i18next'
 
 export function EvidenceSources({
   citations,
-  language,
 }: {
   citations: InvestigationReport['citations']
-  language: 'bn' | 'en'
 }) {
+  const { t } = useTranslation()
+
   return (
     <section>
-      <h3 className="font-semibold text-[#183b2c]">
-        {language === 'bn' ? 'ব্যবহৃত সূত্র' : 'Retrieved sources'}
-      </h3>
+      <h3 className="font-semibold text-[#183b2c]">{t('reports.sources')}</h3>
       {citations.length === 0 ? (
         <p className="mt-2 text-sm leading-6 text-[#617166]">
-          {language === 'bn'
-            ? 'এই তদন্তে উপসর্গ-নির্দিষ্ট কোনো নির্ভরযোগ্য সূত্র পাওয়া যায়নি।'
-            : 'No symptom-specific agricultural source was retrieved for this investigation.'}
+          {t('reports.noSources')}
         </p>
       ) : (
         <ul className="mt-2 space-y-2">

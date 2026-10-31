@@ -11,8 +11,8 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024,
     files: 1,
-    fields: 2,
-    parts: 3,
+    fields: 3,
+    parts: 4,
     fieldSize: 100,
   },
 })
@@ -22,6 +22,7 @@ const segmentRequestSchema = z.object({
   target: z
     .enum(['brown spots', 'yellow discolored region', 'damaged leaf region'])
     .default('brown spots'),
+  language: z.enum(['bn', 'en']).default('bn'),
 }).strict()
 
 export const imagesRouter = Router()
@@ -34,6 +35,7 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
   if (!request.file) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_IMAGE',
       error: 'Select a JPEG, PNG, or WebP image to analyze.',
     })
     return
@@ -43,6 +45,7 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
   if (!parsed.success) {
     response.status(400).json({
       success: false,
+      errorCode: 'INVALID_REQUEST',
       error: 'Choose a supported crop and segmentation target.',
     })
     return
@@ -65,19 +68,29 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
     if (error instanceof TemporaryStoreCapacityError) {
       response.status(503).json({
         success: false,
+        errorCode: 'STORAGE_BUSY',
         error: 'Temporary scan storage is busy. Please try again later.',
       })
       return
     }
 
     if (error instanceof ImageValidationError) {
-      response.status(400).json({ success: false, error: error.message })
+      response.status(400).json({
+        success: false,
+        errorCode: 'INVALID_IMAGE',
+        error: error.message,
+      })
       return
     }
 
     if (error instanceof SamServiceError) {
       response.status(error.statusCode).json({
         success: false,
+        errorCode: error.statusCode === 429
+          ? 'RATE_LIMITED'
+          : error.statusCode === 503
+            ? 'MODEL_UNAVAILABLE'
+            : 'ANALYSIS_FAILED',
         model: SAM_MODEL,
         error: error.message,
         ...(error.requestId ? { requestId: error.requestId } : {}),
@@ -88,6 +101,7 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
     console.error('Image segmentation failed due to an unexpected error.')
     response.status(502).json({
       success: false,
+      errorCode: 'ANALYSIS_FAILED',
       model: SAM_MODEL,
       error: 'We could not analyze this image right now. Please try again later.',
     })

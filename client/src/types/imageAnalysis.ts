@@ -32,4 +32,5 @@ export interface ImageAnalysisRequest {
   image: File
   crop: Crop
   target: SegmentationTarget
+  language: 'bn' | 'en'
 }

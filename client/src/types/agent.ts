@@ -50,6 +50,7 @@ export interface InvestigationReport {
 export interface AgentSessionResponse {
   success: boolean
   sessionId: string
+  language: InvestigationLanguage
   status: InvestigationStatus
   accessToken?: string
   pendingQuestion?: { question: string; why: string }
@@ -64,4 +65,9 @@ export interface StartInvestigationRequest {
   crop: Crop
   language: InvestigationLanguage
   question: string
+}
+
+export interface TranslatedInvestigationText {
+  report?: InvestigationReport
+  pendingQuestion?: { question: string; why: string }
 }
