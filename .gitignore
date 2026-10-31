@@ -9,3 +9,16 @@ uploads/
 temp-uploads/
 *.tsbuildinfo
 .DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Local editor settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Local system files
+Thumbs.db

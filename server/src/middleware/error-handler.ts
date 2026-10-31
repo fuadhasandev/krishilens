@@ -6,6 +6,15 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     return
   }
 
+  if (
+    error instanceof Error &&
+    'type' in error &&
+    error.type === 'entity.too.large'
+  ) {
+    response.status(413).json({ error: 'Request body exceeds the 1 MB limit.' })
+    return
+  }
+
   console.error('Unhandled request error:', error)
   response.status(500).json({ error: 'An unexpected server error occurred.' })
 }

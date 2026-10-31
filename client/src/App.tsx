@@ -1,4 +1,5 @@
 import { ArrowRight, Leaf, Sprout } from 'lucide-react'
+import { CropInvestigationForm } from './components/CropInvestigationForm'
 
 function App() {
   return (
@@ -32,18 +33,13 @@ function App() {
           <p className="mt-5 max-w-lg text-base leading-7 text-[#617166] sm:mt-6 sm:text-lg sm:leading-8">
             Your AI-powered crop investigation assistant.
           </p>
-          <button
-            aria-describedby="investigation-status"
-            className="mt-8 inline-flex min-h-12 cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#aab9ab] px-5 py-3 text-sm font-semibold text-white shadow-sm sm:mt-9 sm:px-6 sm:text-base"
-            disabled
-            type="button"
+          <a
+            className="mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#1f603f] px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#194d33] focus:outline-none focus:ring-2 focus:ring-[#4c8456] focus:ring-offset-2 sm:mt-9 sm:px-6 sm:text-base"
+            href="#investigate"
           >
             Start Investigation
             <ArrowRight aria-hidden="true" size={18} />
-          </button>
-          <p className="mt-3 text-sm text-[#7b887e]" id="investigation-status">
-            Investigations will be available in a future update.
-          </p>
+          </a>
         </div>
 
         <div
@@ -66,6 +62,9 @@ function App() {
           </div>
         </div>
       </section>
+      <div className="relative px-5 pb-16 sm:px-8 sm:pb-20 lg:px-12">
+        <CropInvestigationForm />
+      </div>
     </main>
   )
 }
