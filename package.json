@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "concurrently -k -n client,server -c green,blue \"npm run dev --prefix client\" \"npm run dev --prefix server\"",
     "build": "npm run build --prefix client && npm run build --prefix server",
-    "typecheck": "npm run build --prefix client && npm run typecheck --prefix server"
+    "typecheck": "npm run build --prefix client && npm run typecheck --prefix server",
+    "test": "npm run test --prefix server"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

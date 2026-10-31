@@ -1,7 +1,19 @@
 import { ArrowRight, Leaf, Sprout } from 'lucide-react'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { CropInvestigationForm } from './components/CropInvestigationForm'
+import { ImageAnalysis } from './pages/ImageAnalysis'
 
 function App() {
+  return (
+    <Routes>
+      <Route element={<HomePage />} path="/" />
+      <Route element={<ImageAnalysis />} path="/image-analysis" />
+      <Route element={<Navigate replace to="/" />} path="*" />
+    </Routes>
+  )
+}
+
+function HomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#f7f8f2] text-[#183b2c]">
       <div
@@ -15,9 +27,17 @@ function App() {
           </span>
           <span className="text-xl font-bold tracking-tight">KrishiLens</span>
         </a>
-        <span className="rounded-full border border-[#dce6d6] bg-white/70 px-3 py-1.5 text-xs font-medium text-[#55705d] sm:px-4 sm:text-sm">
-          Made for Bangladesh
-        </span>
+        <div className="flex items-center gap-3">
+          <Link
+            className="text-sm font-semibold text-[#326548] hover:text-[#183b2c]"
+            to="/image-analysis"
+          >
+            Analyze image
+          </Link>
+          <span className="hidden rounded-full border border-[#dce6d6] bg-white/70 px-3 py-1.5 text-xs font-medium text-[#55705d] sm:inline-flex sm:px-4 sm:text-sm">
+            Made for Bangladesh
+          </span>
+        </div>
       </header>
 
       <section className="relative mx-auto grid min-h-[calc(100svh-81px)] w-full max-w-7xl items-center gap-12 px-5 pb-16 pt-8 sm:px-8 sm:pb-20 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-12 lg:py-16">
@@ -40,6 +60,12 @@ function App() {
             Start Investigation
             <ArrowRight aria-hidden="true" size={18} />
           </a>
+          <Link
+            className="ml-3 mt-8 inline-flex min-h-12 items-center justify-center rounded-xl border border-[#dce6d6] bg-white px-5 py-3 text-sm font-semibold text-[#315d3d] transition-colors hover:bg-[#f1f5ed] focus:outline-none focus:ring-2 focus:ring-[#4c8456] focus:ring-offset-2 sm:ml-4 sm:px-6 sm:text-base"
+            to="/image-analysis"
+          >
+            Analyze an image
+          </Link>
         </div>
 
         <div
