@@ -6,6 +6,7 @@ import { aiRouter } from './routes/ai.js'
 import { agentRouter } from './routes/agent.js'
 import { healthRouter } from './routes/health.js'
 import { imagesRouter } from './routes/images.js'
+import { casesRouter } from './routes/cases.js'
 
 export const app = express()
 
@@ -15,4 +16,5 @@ app.use('/api', healthRouter)
 app.use('/api', aiRouter)
 app.use('/api', imagesRouter)
 app.use('/api', agentRouter)
+app.use('/api', casesRouter)
 app.use(errorHandler)

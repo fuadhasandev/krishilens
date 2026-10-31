@@ -557,7 +557,7 @@ test('session access tokens isolate investigations', () => {
 
 test('GET investigation does not disclose state without the bearer token', async () => {
   const scanId = '123e4567-e89b-42d3-a456-426614174000'
-  const { session, accessToken } = sessionStore.create({
+  const { session, accessToken } = await sessionStore.create({
     scanId,
     crop: 'rice',
     language: 'en',

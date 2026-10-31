@@ -55,7 +55,8 @@ Requirements: Node.js 20.19+ and npm.
 | `CLIENT_URL` | Allowed frontend origin for CORS | Defaults to `http://localhost:5173` |
 | `MODEL_API_KEY` | Server-side Meta Model API credential | Required for live AI requests; never sent to the browser |
 | `META_BASE_URL` | Meta Model API base URL | Defaults to `https://api.meta.ai/v1` |
-| `MONGODB_URI` | MongoDB connection string | Reserved; no database connection |
+| `MONGODB_URI` | MongoDB connection string | Required by the API; startup fails clearly if missing or unreachable |
+| `LOCAL_IMAGE_STORAGE_DIR` | Private local image directory | Development-only adapter; defaults to `./data/private-images` from the server directory |
 | `VITE_API_URL` | Backend origin used by the browser | Optional; defaults to `http://localhost:3000`. Never place secrets in `VITE_*` variables. |
 
 ## Development commands
@@ -152,20 +153,47 @@ Content-Type: application/json
 
 The response contains `sessionId`, the original session `language`, `accessToken`, `status`, a sanitized `trace`, and either a `pendingQuestion`, a final `report`, or a status `message`. Use the session token in an `Authorization: Bearer` header for `GET /api/agent/:sessionId`, `POST /api/agent/:sessionId/answer`, and `POST /api/agent/:sessionId/translate`. Follow-up answers may include the original `{ "language": "bn" | "en" }`; the server checks it and keeps that language for the entire investigation. Translation accepts `{ "language": "bn" | "en" }` and returns a separate translated report/question; it does not overwrite the original case text, observations, measurements, or citations. The UI identifies the original language and only displays translated agent text after the explicit translation action. Never put either access token in a URL or log. Investigation reads are marked `Cache-Control: no-store`.
 
+### Persistent cases and re-checks
+
+The API now connects to MongoDB before listening. Set `MONGODB_URI` in `server/.env` to a MongoDB Atlas URI or a local compatible database. Connection errors report the error class only; the URI and credentials are never logged. Mongoose creates indexes for ownership, related IDs, timestamps, and expiry.
+
+The `Case`, `Scan`, `Investigation`, `Trace`, `Recheck`, `AnonymousOwner`, and `AgentScan` collections store case metadata, validated SAM measurements, protected image references, sanitized traces, assessment text, and resumable agent state. Scan images are stored outside MongoDB. Configure `LOCAL_IMAGE_STORAGE_DIR` for local development; files are private, excluded from Git, and served only through an authorized image route. This local filesystem adapter is development-only. No private cloud object-storage provider is configured, so production startup is intentionally blocked until one is added.
+
+Create a case with `POST /api/cases` and JSON `{ "crop": "rice", "language": "bn" }`. A first-time anonymous browser receives an `ownerAccessToken` once. The client stores it in browser local storage and sends it only as an `Authorization: Bearer` header. The database stores only its SHA-256 hash. The anonymous owner token expires after one year; clearing browser storage loses access. There is no account recovery or cross-device access.
+
+Available case endpoints:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /api/cases` | Create a case and, for a new browser session, issue its owner token |
+| `GET /api/cases?page=1&limit=20` | List only the caller's cases |
+| `GET /api/cases/:caseId` | Read a case with its recent scans, investigations, and re-checks |
+| `GET /api/cases/:caseId/scans?page=1&limit=20` | Paginated scan history |
+| `GET /api/cases/:caseId/investigations?page=1&limit=20` | Paginated investigation history |
+| `PATCH /api/cases/:caseId/recheck-date` | Set or clear an intended future re-check date |
+| `POST /api/cases/:caseId/recheck` | Upload, analyze, and save a re-check |
+| `GET /api/cases/:caseId/scans/:scanId/image` | Read a private saved image after owner authorization |
+
+Re-check uploads use multipart fields `image`, `language`, `observations`, optional `previousScanId`, and optional boolean strings `similarLighting`, `similarAngle`, and `samePlantRegion`. Include a UUID `Idempotency-Key` header. Images are validated and normalized, segmented with the existing SAM 3.1 service, then written to private development storage with measurements and metadata saved in MongoDB. The form asks the farmer to confirm comparable lighting, angle, and plant area; missing confirmations or unvalidated affected-area measurements keep the comparison inconclusive. The displayed change is current minus previous percentage points. Even a comparable decline is described only as a possible visible improvement, never proof of recovery.
+
+Muse Spark receives only the deterministic comparison status, reasons, and farmer observations for the progress note; the numeric measurements remain separate and cannot be changed by the model. If the Meta API is unavailable or unconfigured, the endpoint stores a cautious localized fallback. An intended date appears as an in-app upcoming/overdue reminder; there is no scheduler or automatic message delivery.
+
+Agent scans and investigation session state now use MongoDB-backed adapters in the running API. Session access tokens remain bearer-only and are stored as hashes; state is bounded by the existing agent execution limits. A persistent agent scan retains validated analysis metadata, not the uploaded image. Only images uploaded through the case re-check workflow are retained and associated with a case. Phase 4 investigations created before this change are not backfilled or automatically attached to a crop case.
+
 ## Languages
 
 The interface defaults to Bangla (`bn`) for new users and restores only a valid `bn`/`en` preference from `localStorage` (`krishilens.language`). Switching language updates visible static text, document language/title, accessibility labels, and localized number formatting without reloading or resetting the current route or form state. Static copy is bundled in `client/src/i18n/locales/`; it is not machine-translated at runtime. Muse Spark generates investigation content in the language selected when a case starts. If the interface language changes during a case, use the explicit translation action; the original report remains unchanged. Translation output is schema-checked and numeric values/IDs/citations are preserved, but machine translation may still be imperfect.
 
 The agent uses the Meta Responses API function-calling protocol (`function_call`, matching `function_call_output` items, and `previous_response_id`). The server validates tool names, arguments, and outputs; runs a maximum of six model turns; blocks repeated tool calls without new farmer information; and pauses at one follow-up question until an answer arrives. Deterministic report checks reject un-retrieved citations, unsupported percentages, non-agronomic sources used as disease evidence, and chemical treatment instructions. Trace entries report actions only and never include hidden model reasoning or farmer answers.
 
-**Temporary storage limitation:** scans and investigations are held in memory for up to two hours and are lost when the server restarts. They are protected by unguessable bearer tokens whose hashes are stored server-side. MongoDB persistence and user accounts are not implemented. The current curated collection contains the accessible BRRI official portal as a referral/institution record only; it has no symptom-specific disease passage, so the guidance tool explicitly reports no symptom-level evidence. Reports must remain tentative/insufficient and refer farmers to qualified local assistance when needed.
+**Persistence and security limitations:** case access is anonymous and tied to the browser's local storage; it cannot be transferred to another device or recovered if the token is lost. No cloud image-storage adapter, account system, automatic reminders, or backfill of earlier investigations is implemented. A disposable MongoDB integration run is required before claiming database persistence has been verified. The current curated collection contains the accessible BRRI official portal as a referral/institution record only; it has no symptom-specific disease passage, so the guidance tool explicitly reports no symptom-level evidence. Reports must remain tentative/insufficient and refer farmers to qualified local assistance when needed.
 
 ## Planned architecture
 
 - `client/src/` contains the mobile-first React UI, reusable components, pages, service clients, shared types, and assets.
 - `server/src/routes/` exposes API endpoints; `middleware/` handles cross-cutting concerns; `config/` owns runtime configuration.
-- `server/src/agent/` contains the bounded tool-calling loop, Zod-validated tool registry, temporary stores, report safety checks, trace recorder, and scan/guidance/follow-up/report tools. `server/src/services/` contains Muse Spark transport, SAM parsing, image normalization, and deterministic mask calculations. The server mediates model API calls so credentials are never sent to the browser.
-- `server/src/models/` will hold MongoDB/Mongoose models once persistence is introduced.
+- `server/src/agent/` contains the bounded tool-calling loop, Zod-validated tool registry, in-memory test adapters and MongoDB runtime adapters, report safety checks, trace recorder, and scan/guidance/follow-up/report tools. `server/src/services/` contains Muse Spark transport, SAM parsing, image normalization, private image storage, deterministic mask calculations, and scan comparison. The server mediates model API calls so credentials are never sent to the browser.
+- `server/src/models/` contains the MongoDB/Mongoose schemas and indexes; `server/src/routes/cases.ts` implements owner-scoped case, schedule, image, and re-check APIs.
 - `eval/` and `demo/` are reserved for evaluation assets and hackathon demonstrations.
 
-MongoDB scan history, voice transcription, and persistent authentication remain out of scope. The current investigation loop is bounded and does not make disease diagnoses or execute chemical treatments. This MVP is not production-ready.
+Voice transcription and persistent user accounts remain out of scope. The current investigation loop is bounded and does not make disease diagnoses or execute chemical treatments. Production deployment requires a private cloud image-storage adapter and a disposable-database integration test. This MVP is not production-ready.

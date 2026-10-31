@@ -58,7 +58,7 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
       parsed.data.crop,
       parsed.data.target,
     )
-    const { scanId, accessToken } = scanStore.create(
+    const { scanId, accessToken } = await scanStore.create(
       parsed.data.crop,
       parsed.data.target,
       result,

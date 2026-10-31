@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import type { SamAnalysis } from '../services/sam.js'
 import { TemporaryStoreCapacityError } from './storeErrors.js'
 import type { Crop, StoredScan } from './types.js'
+import { AgentScanModel } from '../models/index.js'
 
 const SCAN_TTL_MS = 2 * 60 * 60 * 1000
 const MAX_ACTIVE_SCANS = 1_000
@@ -21,9 +22,9 @@ export interface ScanStore {
     crop: Crop,
     target: string,
     analysis: SamAnalysis,
-  ): { scanId: string; accessToken: string }
-  getAuthorized(scanId: string, accessToken: string): StoredScan | null
-  get(scanId: string): StoredScan | null
+  ): { scanId: string; accessToken: string } | Promise<{ scanId: string; accessToken: string }>
+  getAuthorized(scanId: string, accessToken: string): StoredScan | null | Promise<StoredScan | null>
+  get(scanId: string): StoredScan | null | Promise<StoredScan | null>
 }
 
 export class InMemoryScanStore implements ScanStore {
@@ -82,4 +83,73 @@ export class InMemoryScanStore implements ScanStore {
   }
 }
 
-export const scanStore: ScanStore = new InMemoryScanStore()
+export class MongoScanStore implements ScanStore {
+  async create(
+    crop: Crop,
+    target: string,
+    analysis: SamAnalysis,
+  ): Promise<{ scanId: string; accessToken: string }> {
+    const now = Date.now()
+    const scanId = randomUUID()
+    const accessToken = randomBytes(32).toString('base64url')
+    const safeAnalysis: SamAnalysis = {
+      ...analysis,
+      overlay: { imageUrl: null },
+    }
+    await AgentScanModel.create({
+      scanId,
+      accessTokenHash: hashAccessToken(accessToken),
+      crop,
+      target,
+      analysis: safeAnalysis,
+      createdAt: new Date(now),
+      expiresAt: new Date(now + 365 * 24 * 60 * 60 * 1000),
+    })
+    return { scanId, accessToken }
+  }
+
+  async getAuthorized(scanId: string, accessToken: string): Promise<StoredScan | null> {
+    const record = await AgentScanModel.findOne({
+      scanId,
+      expiresAt: { $gt: new Date() },
+    }).select('+accessTokenHash').lean()
+    if (
+      !record ||
+      !tokensMatch(record.accessTokenHash, accessToken)
+    ) {
+      return null
+    }
+    return {
+      id: record.scanId,
+      accessTokenHash: record.accessTokenHash,
+      crop: record.crop,
+      target: record.target,
+      analysis: record.analysis,
+      createdAt: record.createdAt.getTime(),
+      expiresAt: record.expiresAt.getTime(),
+    }
+  }
+
+  async get(scanId: string): Promise<StoredScan | null> {
+    const record = await AgentScanModel.findOne({
+      scanId,
+      expiresAt: { $gt: new Date() },
+    }).select('+accessTokenHash').lean()
+    if (!record) return null
+    return {
+      id: record.scanId,
+      accessTokenHash: record.accessTokenHash,
+      crop: record.crop,
+      target: record.target,
+      analysis: record.analysis,
+      createdAt: record.createdAt.getTime(),
+      expiresAt: record.expiresAt.getTime(),
+    }
+  }
+}
+
+export let scanStore: ScanStore = new InMemoryScanStore()
+
+export function useMongoScanStore(): void {
+  scanStore = new MongoScanStore()
+}

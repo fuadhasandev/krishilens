@@ -1,8 +1,8 @@
-import { Router } from 'express'
+import { Router, type Response } from 'express'
 import { z } from 'zod'
 import { runAgentLoop } from '../agent/loop.js'
 import { scanStore } from '../agent/scanStore.js'
-import { sessionStore } from '../agent/sessionStore.js'
+import { SessionConflictError, sessionStore } from '../agent/sessionStore.js'
 import { TemporaryStoreCapacityError } from '../agent/storeErrors.js'
 import type { AgentSession } from '../agent/types.js'
 import { cropSchema, languageSchema } from '../agent/types.js'
@@ -60,6 +60,24 @@ function publicSession(session: AgentSession) {
   }
 }
 
+async function runAndSaveSession(session: AgentSession): Promise<void> {
+  activeSessions.add(session.id)
+  try {
+    await runAgentLoop(session)
+  } finally {
+    activeSessions.delete(session.id)
+    await sessionStore.save(session)
+  }
+}
+
+function sendSessionConflict(response: Response): void {
+  response.status(409).json({
+    success: false,
+    errorCode: 'ALREADY_PROCESSING',
+    error: 'This investigation changed during the request. Reload it before trying again.',
+  })
+}
+
 agentRouter.post('/agent/:sessionId/translate', async (request, response) => {
   const sessionIdParsed = z.string().uuid().safeParse(request.params.sessionId)
   const translationParsed = translateSchema.safeParse(request.body)
@@ -82,7 +100,7 @@ agentRouter.post('/agent/:sessionId/translate', async (request, response) => {
     return
   }
 
-  const session = sessionStore.getAuthorized(sessionIdParsed.data, token)
+  const session = await sessionStore.getAuthorized(sessionIdParsed.data, token)
   if (!session) {
     response.status(404).json({
       success: false,
@@ -180,7 +198,7 @@ agentRouter.post('/agent/investigate', async (request, response) => {
     return
   }
 
-  const scan = scanStore.getAuthorized(parsed.data.scanId, scanToken)
+  const scan = await scanStore.getAuthorized(parsed.data.scanId, scanToken)
   if (!scan) {
     response.status(404).json({
       success: false,
@@ -198,9 +216,9 @@ agentRouter.post('/agent/investigate', async (request, response) => {
     return
   }
 
-  let created: ReturnType<typeof sessionStore.create>
+  let created: Awaited<ReturnType<typeof sessionStore.create>>
   try {
-    created = sessionStore.create({
+    created = await sessionStore.create({
       scanId: scan.id,
       crop: parsed.data.crop,
       language: parsed.data.language,
@@ -226,12 +244,14 @@ agentRouter.post('/agent/investigate', async (request, response) => {
   }
 
   const { session, accessToken } = created
-  activeSessions.add(session.id)
   try {
-    await runAgentLoop(session)
-  } finally {
-    activeSessions.delete(session.id)
-    sessionStore.save(session)
+    await runAndSaveSession(session)
+  } catch (error) {
+    if (error instanceof SessionConflictError) {
+      sendSessionConflict(response)
+      return
+    }
+    throw error
   }
 
   response.status(200).json({
@@ -263,7 +283,7 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
     return
   }
 
-  const session = sessionStore.getAuthorized(sessionIdParsed.data, token)
+  const session = await sessionStore.getAuthorized(sessionIdParsed.data, token)
   if (!session) {
     response.status(404).json({
       success: false,
@@ -306,18 +326,20 @@ agentRouter.post('/agent/:sessionId/answer', async (request, response) => {
   session.status = 'investigating'
   session.failureMessage = undefined
 
-  activeSessions.add(session.id)
   try {
-    await runAgentLoop(session)
-  } finally {
-    activeSessions.delete(session.id)
-    sessionStore.save(session)
+    await runAndSaveSession(session)
+  } catch (error) {
+    if (error instanceof SessionConflictError) {
+      sendSessionConflict(response)
+      return
+    }
+    throw error
   }
 
   response.status(200).json({ success: true, ...publicSession(session) })
 })
 
-agentRouter.get('/agent/:sessionId', (request, response) => {
+agentRouter.get('/agent/:sessionId', async (request, response) => {
   const sessionIdParsed = z.string().uuid().safeParse(request.params.sessionId)
   if (!sessionIdParsed.success) {
     response.status(404).json({
@@ -338,7 +360,7 @@ agentRouter.get('/agent/:sessionId', (request, response) => {
     return
   }
 
-  const session = sessionStore.getAuthorized(sessionIdParsed.data, token)
+  const session = await sessionStore.getAuthorized(sessionIdParsed.data, token)
   if (!session) {
     response.status(404).json({
       success: false,

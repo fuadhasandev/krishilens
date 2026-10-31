@@ -92,6 +92,15 @@ describe('KrishiLens bilingual interface', () => {
     expect(i18n.t('errors.INVALID_IMAGE')).toBe('Choose a valid JPEG, PNG, or WebP image up to 5 MB.')
   })
 
+  it('localizes case history and re-check labels in both supported languages', async () => {
+    await i18n.changeLanguage('en')
+    expect(i18n.t('caseHistory.title')).toBe('Crop case history')
+    expect(i18n.t('caseHistory.comparisonLimitations')).toContain('does not prove recovery')
+    await i18n.changeLanguage('bn')
+    expect(i18n.t('caseHistory.title')).toBe('ফসলের কেসের ইতিহাস')
+    expect(i18n.t('caseHistory.comparisonLimitations')).toContain('প্রমাণ হয় না')
+  })
+
   it('keeps the translation dictionaries in parity', () => {
     expect(keyPaths(en).sort()).toEqual(keyPaths(bn).sort())
   })

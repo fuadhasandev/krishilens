@@ -94,7 +94,12 @@ export function ImageAnalysis() {
         <span className="rounded-full border border-[#dce6d6] bg-white/70 px-3 py-1.5 text-xs font-medium text-[#55705d] sm:text-sm">
           {t('imageAnalysis.model')}
         </span>
-        <LanguageSwitcher />
+        <div className="flex items-center gap-2">
+          <Link className="text-sm font-semibold text-[#326548] hover:text-[#183b2c]" to="/cases">
+            {t('caseHistory.title')}
+          </Link>
+          <LanguageSwitcher />
+        </div>
       </header>
 
       <section className="mx-auto w-full max-w-5xl px-5 pb-16 sm:px-8">

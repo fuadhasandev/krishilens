@@ -61,6 +61,7 @@ export interface AgentSession {
   retrievedSourceIds: string[]
   toolCallFingerprints: string[]
   failureMessage?: string
+  storageVersion?: number
 }
 
 export interface InvestigationReport {

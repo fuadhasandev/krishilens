@@ -4,12 +4,18 @@ import { useTranslation } from 'react-i18next'
 import { CropInvestigationForm } from './components/CropInvestigationForm'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { ImageAnalysis } from './pages/ImageAnalysis'
+import { CaseHistory } from './pages/CaseHistory'
+import { CaseDetails } from './pages/CaseDetails'
+import { Recheck } from './pages/Recheck'
 
 function App() {
   return (
     <Routes>
       <Route element={<HomePage />} path="/" />
       <Route element={<ImageAnalysis />} path="/image-analysis" />
+      <Route element={<CaseHistory />} path="/cases" />
+      <Route element={<CaseDetails />} path="/cases/:caseId" />
+      <Route element={<Recheck />} path="/cases/:caseId/recheck" />
       <Route element={<Navigate replace to="/" />} path="*" />
     </Routes>
   )
@@ -38,6 +44,12 @@ function HomePage() {
             to="/image-analysis"
           >
             {t('navigation.analyzeImage')}
+          </Link>
+          <Link
+            className="text-sm font-semibold text-[#326548] hover:text-[#183b2c]"
+            to="/cases"
+          >
+            {t('caseHistory.title')}
           </Link>
           <span className="hidden rounded-full border border-[#dce6d6] bg-white/70 px-3 py-1.5 text-xs font-medium text-[#55705d] sm:inline-flex sm:px-4 sm:text-sm">
             {t('home.madeFor')}

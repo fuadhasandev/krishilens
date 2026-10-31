@@ -57,11 +57,6 @@ export interface AgentLoopDependencies {
   scans: ScanStore
 }
 
-const defaultDependencies: AgentLoopDependencies = {
-  createResponse: createMetaToolResponse,
-  scans: scanStore,
-}
-
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map(stableJson).join(',')}]`
@@ -158,8 +153,12 @@ function failSession(
 
 export async function runAgentLoop(
   session: AgentSession,
-  dependencies: AgentLoopDependencies = defaultDependencies,
+  dependencies?: AgentLoopDependencies,
 ): Promise<void> {
+  const activeDependencies = dependencies ?? {
+    createResponse: createMetaToolResponse,
+    scans: scanStore,
+  }
   if (session.status !== 'investigating') {
     return
   }
@@ -178,7 +177,7 @@ export async function runAgentLoop(
     return
   }
 
-  const scan = dependencies.scans.get(session.scanId)
+  const scan = await activeDependencies.scans.get(session.scanId)
   if (!scan) {
     failSession(
       session,
@@ -209,7 +208,7 @@ export async function runAgentLoop(
         max_output_tokens: 3_000,
         ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
       }
-      const response = await dependencies.createResponse(
+      const response = await activeDependencies.createResponse(
         request,
         signal,
         MODEL_REQUEST_TIMEOUT_MS,
