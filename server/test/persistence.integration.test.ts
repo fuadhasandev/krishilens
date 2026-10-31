@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
+import { spawn, type ChildProcess } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { once } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { createServer } from 'node:net'
+import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
 import mongoose from 'mongoose'
 import { app } from '../src/app.js'
@@ -23,14 +23,65 @@ import {
   ScanModel,
   TraceModel,
 } from '../src/models/index.js'
-import { LocalPrivateImageStorage } from '../src/services/privateImageStorage.js'
+import { privateImageStorage } from '../src/services/privateImageStorage.js'
 import type { SamAnalysis } from '../src/services/sam.js'
 
 import '../src/config/env.js'
 
 const enabled = process.env.RUN_MONGODB_INTEGRATION_TESTS === '1'
 
-test('MongoDB persists case, scan image, re-check, and awaiting agent state across reconnect', {
+async function availablePort(): Promise<number> {
+  const listener = createServer()
+  listener.listen(0, '127.0.0.1')
+  await once(listener, 'listening')
+  const address = listener.address()
+  assert.ok(address && typeof address !== 'string')
+  await new Promise<void>((resolve, reject) => {
+    listener.close((error) => error ? reject(error) : resolve())
+  })
+  return address.port
+}
+
+async function startApiProcess(): Promise<{ child: ChildProcess; baseUrl: string }> {
+  const port = await availablePort()
+  const child = spawn(
+    process.execPath,
+    ['--import', 'tsx', 'src/index.ts'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env, PORT: String(port) },
+      stdio: 'ignore',
+    },
+  )
+
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (child.exitCode !== null) {
+      throw new Error(`KrishiLens API child exited during startup (${child.exitCode}).`)
+    }
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
+        signal: AbortSignal.timeout(1000),
+      })
+      if (response.ok) {
+        return { child, baseUrl: `http://127.0.0.1:${port}` }
+      }
+    } catch {
+      await delay(500)
+    }
+  }
+  child.kill('SIGTERM')
+  throw new Error('KrishiLens API child did not become ready after MongoDB startup.')
+}
+
+async function stopApiProcess(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null) return
+  const exited = once(child, 'exit')
+  child.kill('SIGTERM')
+  await Promise.race([exited, delay(3000)])
+  if (child.exitCode === null) child.kill('SIGKILL')
+}
+
+test('MongoDB persists case, scan image, re-check, and awaiting agent state across process restarts', {
   skip: !enabled,
 }, async () => {
   await connectDatabase()
@@ -50,10 +101,9 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     agentScanIds: [] as string[],
     investigationIds: [] as string[],
   }
-  const storageRoot = await mkdtemp(join(tmpdir(), 'krishilens-mongo-integration-'))
-  const storage = new LocalPrivateImageStorage(storageRoot)
   const imageRefs: string[] = []
   let server = instance
+  let apiProcess: ChildProcess | undefined
 
   try {
     const createdResponse = await fetch(`http://127.0.0.1:${address.port}/api/cases`, {
@@ -107,7 +157,7 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     const imageRef = `${owner.ownerId}/${caseId}/${scanId}.jpg`
     imageRefs.push(imageRef)
     const imageBytes = Buffer.from('protected test image fixture')
-    await storage.put(imageRef, imageBytes)
+    await privateImageStorage.put(imageRef, imageBytes)
     await ScanModel.create({
       scanId,
       caseId,
@@ -215,13 +265,47 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     await closed
     await disconnectDatabase()
 
+    const firstRestart = await startApiProcess()
+    apiProcess = firstRestart.child
+    const firstRestartSession = await fetch(
+      `${firstRestart.baseUrl}/api/agent/${createdSession.session.id}`,
+      { headers: { Authorization: `Bearer ${createdSession.accessToken}` } },
+    )
+    assert.equal(firstRestartSession.status, 200)
+    const firstRestartState = await firstRestartSession.json() as {
+      status: string
+      pendingQuestion?: { question: string }
+    }
+    assert.equal(firstRestartState.status, 'awaiting_farmer')
+    assert.equal(firstRestartState.pendingQuestion?.question, 'When did you first notice the spots?')
+    await stopApiProcess(apiProcess)
+    apiProcess = undefined
+
+    const restartedProcess = await startApiProcess()
+    apiProcess = restartedProcess.child
+
+    const caseAfterRestart = await fetch(
+      `${restartedProcess.baseUrl}/api/cases/${caseId}`,
+      { headers: { Authorization: `Bearer ${ownerToken}` } },
+    )
+    assert.equal(caseAfterRestart.status, 200)
+    const unauthorizedAfterRestart = await fetch(
+      `${restartedProcess.baseUrl}/api/cases/${caseId}`,
+    )
+    assert.equal(unauthorizedAfterRestart.status, 401)
+    const savedImageAfterRestart = await fetch(
+      `${restartedProcess.baseUrl}/api/cases/${caseId}/scans/${scanId}/image`,
+      { headers: { Authorization: `Bearer ${ownerToken}` } },
+    )
+    assert.equal(savedImageAfterRestart.status, 200)
+    assert.deepEqual(
+      Buffer.from(await savedImageAfterRestart.arrayBuffer()),
+      imageBytes,
+    )
+
+    await stopApiProcess(apiProcess)
+    apiProcess = undefined
     await connectDatabase()
-    useMongoScanStore()
-    useMongoSessionStore()
-    server = app.listen(0)
-    await once(server, 'listening')
-    const restartedAddress = server.address()
-    assert.ok(restartedAddress && typeof restartedAddress !== 'string')
 
     const recovered = await new MongoSessionStore().getAuthorized(
       createdSession.session.id,
@@ -242,12 +326,6 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
       true,
     )
 
-    const caseAfterRestart = await fetch(
-      `http://127.0.0.1:${restartedAddress.port}/api/cases/${caseId}`,
-      { headers: { Authorization: `Bearer ${ownerToken}` } },
-    )
-    assert.equal(caseAfterRestart.status, 200)
-
     const firstRead = await new MongoSessionStore().getAuthorized(
       createdSession.session.id,
       createdSession.accessToken,
@@ -262,8 +340,23 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     concurrentRead.answerCount += 1
     await assert.rejects(new MongoSessionStore().save(concurrentRead), SessionConflictError)
   } finally {
-    server.closeAllConnections()
-    await new Promise<void>((resolve) => server.close(() => resolve()))
+    if (apiProcess) await stopApiProcess(apiProcess)
+    if (server.listening) {
+      server.closeAllConnections()
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve())
+      })
+    }
+    if (
+      !mongooseReady() &&
+      (
+        cleanupIds.caseIds.length > 0 ||
+        cleanupIds.investigationIds.length > 0 ||
+        cleanupIds.agentScanIds.length > 0
+      )
+    ) {
+      await connectDatabase()
+    }
     if (mongooseReady()) {
       await Promise.all([
         CaseModel.deleteMany({ caseId: { $in: cleanupIds.caseIds } }),
@@ -276,8 +369,7 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
       ])
       await disconnectDatabase()
     }
-    await Promise.all(imageRefs.map((imageRef) => storage.remove(imageRef)))
-    await rm(storageRoot, { recursive: true, force: true })
+    await Promise.all(imageRefs.map((imageRef) => privateImageStorage.remove(imageRef)))
   }
 })
 
