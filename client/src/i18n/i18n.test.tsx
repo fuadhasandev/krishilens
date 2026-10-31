@@ -87,9 +87,9 @@ describe('KrishiLens bilingual interface', () => {
 
   it('localizes stable API error codes', async () => {
     await i18n.changeLanguage('bn')
-    expect(i18n.t('errors.INVALID_IMAGE')).toBe('৫ এমবি বা তার কম আকারের JPEG, PNG বা WebP ছবি বেছে নিন।')
+    expect(i18n.t('errors.INVALID_IMAGE')).toBe('৪ এমবি বা তার কম আকারের JPEG, PNG বা WebP ছবি বেছে নিন।')
     await i18n.changeLanguage('en')
-    expect(i18n.t('errors.INVALID_IMAGE')).toBe('Choose a valid JPEG, PNG, or WebP image up to 5 MB.')
+    expect(i18n.t('errors.INVALID_IMAGE')).toBe('Choose a valid JPEG, PNG, or WebP image up to 4 MB.')
   })
 
   it('localizes case history and re-check labels in both supported languages', async () => {

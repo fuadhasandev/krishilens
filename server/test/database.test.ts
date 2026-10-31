@@ -29,7 +29,7 @@ test('a first re-check can persist without a previous comparison', async () => {
     assessment: {
       language: 'en',
       text: 'There is no earlier scan available for comparison.',
-      generatedBy: 'fallback',
+      generatedBy: 'built_in',
     },
     status: 'completed',
   })

@@ -9,13 +9,15 @@ The project includes a text-only Muse Spark preview, SAM 3.1 image segmentation,
 - **Frontend:** React, Vite, TypeScript, Tailwind CSS (official Vite plugin), React Router, Axios, Lucide React, i18next, react-i18next
 - **Backend:** Node.js, Express, TypeScript, `tsx`, dotenv, Zod, OpenAI SDK (Meta Responses API), Multer, Sharp
 - **SAM parsing:** `@meta-sam/parser` for streamed segmentation records and binary masks
-- **Planned data:** MongoDB, Mongoose; Zod validates API requests
+- **Data:** MongoDB Atlas, Mongoose; Zod validates API requests
 - **AI:** Muse Spark text reasoning and SAM 3.1 segmentation via Meta Model API
 - **Planned AI:** Muse Voice Transcribe
 
 ## Local setup
 
-Requirements: Node.js 20.19+ and npm.
+Requirements: Node.js 22.x and npm.
+
+For two-project Vercel deployment instructions, see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
 1. Install dependencies from the repository root:
 
@@ -31,7 +33,7 @@ Requirements: Node.js 20.19+ and npm.
    cp server/.env.example server/.env
    ```
 
-   The root `.env.example` lists the same variables for reference. Keep real credentials in an ignored `.env` file; never put server secrets in frontend variables.
+   The root `.env.example` lists the backend variables for reference. Keep real credentials in an ignored `.env` file; never put server secrets in frontend variables.
 
 3. Optionally configure the frontend API URL:
 
@@ -61,7 +63,7 @@ Requirements: Node.js 20.19+ and npm.
 | `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | Required with the `cloudinary` provider; server-side only |
 | `CLOUDINARY_API_KEY` | Cloudinary API key | Required with the `cloudinary` provider; server-side only |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret | Required with the `cloudinary` provider; server-side only |
-| `VITE_API_URL` | Backend origin used by the browser | Optional; defaults to `http://localhost:3000`. Never place secrets in `VITE_*` variables. |
+| `VITE_API_URL` | Backend origin used by the browser | Optional for local Vite development (defaults to `http://localhost:3000`); required for deployment. Never place secrets in `VITE_*` variables. |
 
 ## Development commands
 
@@ -72,6 +74,8 @@ Run these from the repository root:
 | `npm run dev` | Run the Vite frontend and `tsx` backend together |
 | `npm run build` | Build the frontend and compile the backend |
 | `npm run typecheck` | Check both TypeScript projects (the client check also produces its production build) |
+
+Production build and typecheck commands require `VITE_API_URL` to be set to the HTTPS backend origin. See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for a local verification command.
 
 To run the optional real Cloudinary integration test, set `IMAGE_STORAGE_PROVIDER=cloudinary` and `RUN_CLOUDINARY_INTEGRATION_TESTS=1` in the server process environment, then run `npm run test:cloudinary` from `server/`. The test requires the Cloudinary credentials and MongoDB connection, and deletes its temporary image and records.
 | `npm test` | Run backend agent, upload, parser, mask-math, and provider error tests |
@@ -89,7 +93,7 @@ Send `multipart/form-data` with:
 
 | Field | Required | Values |
 | --- | --- | --- |
-| `image` | Yes | JPEG, PNG, or WebP; maximum 5 MB |
+| `image` | Yes | JPEG, PNG, or WebP; maximum 4 MB |
 | `crop` | No | `rice` (default), `wheat`, `maize`, `jute`, `other` |
 | `target` | No | `brown spots` (default), `yellow discolored region`, `damaged leaf region` |
 | `language` | No | `bn` (default) or `en`; included with browser requests |
@@ -107,7 +111,7 @@ The backend validates and decodes the uploaded image, auto-rotates it, and resiz
 
 The JSON response includes `success`, `model`, normalized `image` dimensions, leaf-mask status and pixel count, candidate affected pixel count/percentage/status, detected `objects`, a transparent PNG `overlay.imageUrl`, provider `requestIds`, and short-lived `scanId`/`scanAccessToken` values for an investigation. Keep the access token private; the browser holds it in memory and sends it only in an `Authorization: Bearer` header. The percentage is computed only when validated leaf and candidate masks are available; it is the candidate mask intersection with the leaf mask divided by leaf-mask pixels. This is a geometric estimate of model-selected pixels only, **not** a disease diagnosis or validated severity measure. Missing, invalid, or disjoint masks produce no estimate rather than a zero-damage claim. Overlay green outlines mark the leaf mask; orange pixels show the candidate mask, including portions outside the leaf. The selected interface language is sent as `language`; API status and error codes remain language-neutral.
 
-The endpoint returns 400 for missing/invalid uploads, 413 for files larger than 5 MB, 503 when the model key is unavailable, 429 for provider rate limits, 504 for timeouts, and 502 for other provider failures. Error responses include a friendly `error` and do not expose upstream stack traces or credentials.
+The endpoint returns 400 for missing/invalid uploads, 413 for files larger than 4 MB, 503 when the model key is unavailable, 429 for provider rate limits, 504 for timeouts, and 502 for other provider failures. Error responses include a friendly `error` and do not expose upstream stack traces or credentials.
 
 Meta documents SAM 3.1's Responses API and parser at [SAM overview](https://dev.meta.ai/docs/sam/overview), [segmenting](https://dev.meta.ai/docs/sam/segmenting), [client libraries](https://dev.meta.ai/docs/sam/client-libraries), and [API basics](https://dev.meta.ai/docs/cookbook/sam-api-basics).
 

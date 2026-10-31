@@ -1,8 +1,6 @@
 import { ImagePlus, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-
-const maxFileSize = 5 * 1024 * 1024
-const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+import { isSupportedImageUpload } from '../utils/imageUpload'
 
 interface ImageUploaderProps {
   image: File | null
@@ -23,11 +21,7 @@ export function ImageUploader({
     if (!file) {
       return
     }
-    if (!allowedTypes.has(file.type)) {
-      onImageChange(null, 'INVALID_IMAGE')
-      return
-    }
-    if (file.size > maxFileSize) {
+    if (!isSupportedImageUpload(file)) {
       onImageChange(null, 'INVALID_IMAGE')
       return
     }
@@ -43,7 +37,13 @@ export function ImageUploader({
           <input
             accept="image/jpeg,image/png,image/webp"
             className="sr-only"
-            onChange={(event) => selectImage(event.currentTarget.files?.[0])}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              if (file && !isSupportedImageUpload(file)) {
+                event.currentTarget.value = ''
+              }
+              selectImage(file)
+            }}
             type="file"
           />
         </label>
@@ -54,7 +54,13 @@ export function ImageUploader({
             accept="image/jpeg,image/png,image/webp"
             capture="environment"
             className="sr-only"
-            onChange={(event) => selectImage(event.currentTarget.files?.[0])}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0]
+              if (file && !isSupportedImageUpload(file)) {
+                event.currentTarget.value = ''
+              }
+              selectImage(file)
+            }}
             type="file"
           />
         </label>

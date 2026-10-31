@@ -22,12 +22,13 @@ import {
 } from '../services/privateImageStorage.js'
 import { SAM_MODEL, SamServiceError, segmentCropImage } from '../services/sam.js'
 import { compareScans, type ComparableScan, type ScanComparison } from '../services/scanComparison.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../config/uploads.js'
 
 const bearerPattern = /^Bearer ([A-Za-z0-9_-]{40,100})$/
 const ownerTokenLifetimeMs = 365 * 24 * 60 * 60 * 1000
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 12, parts: 14, fieldSize: 4096 },
+  limits: { fileSize: MAX_IMAGE_UPLOAD_BYTES, files: 1, fields: 12, parts: 14, fieldSize: 4096 },
 })
 
 const cropSchema = z.enum(['rice', 'wheat', 'maize', 'jute', 'other'])

@@ -1,11 +1,12 @@
 import axios from 'axios'
+import { apiBaseUrl } from './apiBaseUrl'
 import type {
   CropAnalysisRequest,
   CropAnalysisResponse,
 } from '../types/cropAnalysis'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
+  baseURL: apiBaseUrl,
   timeout: 35_000,
 })
 

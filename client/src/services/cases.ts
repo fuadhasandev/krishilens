@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { apiBaseUrl } from './apiBaseUrl'
 import type {
   CaseDetailsResponse,
   CaseRecheck,
@@ -8,8 +9,8 @@ import type {
 import type { Crop } from '../types/cropAnalysis'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
-  timeout: 190_000,
+  baseURL: apiBaseUrl,
+  timeout: 290_000,
 })
 
 const ownerTokenKey = 'krishilens.case-owner-token'

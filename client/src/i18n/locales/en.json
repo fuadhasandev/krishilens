@@ -55,7 +55,7 @@
     "chooseImage": "Choose an image",
     "chooseAnother": "Choose another image",
     "takePhoto": "Take a photo",
-    "fileRules": "JPEG, PNG, or WebP · Up to 5 MB · Single image only",
+    "fileRules": "JPEG, PNG, or WebP · Up to 4 MB · Single image only",
     "analyze": "Analyze image",
     "segmenting": "Segmenting image…",
     "preview": "Preview of {{name}}",
@@ -74,6 +74,7 @@
     "noPercent": "No percentage is shown because the masks were absent or could not be validated.",
     "estimatedAffectedArea": "Estimated affected area",
     "warning": "The segmentation service returned an observation that needs attention.",
+    "responseSizeNotice": "The overlay was omitted because the analysis response exceeded the hosting size limit. Measurements and scan access are unchanged.",
     "caution": "Segmentation highlights visual regions only. It does not diagnose a disease or establish scientifically validated crop severity. Confirm observations with a qualified agricultural officer.",
     "samRequestIds": "SAM request IDs: {{ids}}",
     "comparison": "Segmentation image comparison",
@@ -193,7 +194,7 @@
     "overdue": "Re-check is overdue",
     "noReminder": "No re-check date is planned.",
     "uploadTitle": "Upload a current crop photo",
-    "uploadInstructions": "Use a clear photo of the same plant area when possible. SAM observations are visual estimates, not a diagnosis.",
+    "uploadInstructions": "Use a clear photo of the same plant area when possible. JPEG, PNG, or WebP up to 4 MB. SAM observations are visual estimates, not a diagnosis.",
     "chooseImage": "Choose a photo",
     "observations": "What has changed since the last scan?",
     "observationsPlaceholder": "Describe visible changes or new symptoms",
@@ -213,6 +214,7 @@
     "inconclusive": "Inconclusive comparison",
     "comparisonLimitations": "Image measurements can vary with framing, lighting, and the plant area photographed. A smaller percentage does not prove recovery or treatment success.",
     "progressAssessment": "Cautious progress note",
+    "noComparisonNote": "No earlier scan was available, so this standard note was used.",
     "modelFallback": "This note uses a built-in explanation because the AI service was unavailable.",
     "visibleOnly": "Visible image observation only; not a diagnosis or proof of plant health.",
     "report": "Saved report",
@@ -227,7 +229,7 @@
     "page": "Page {{page}}"
   },
   "errors": {
-    "INVALID_IMAGE": "Choose a valid JPEG, PNG, or WebP image up to 5 MB.",
+    "INVALID_IMAGE": "Choose a valid JPEG, PNG, or WebP image up to 4 MB.",
     "MODEL_UNAVAILABLE": "The AI service is temporarily unavailable. Please try again later.",
     "ANALYSIS_FAILED": "We could not complete the analysis. Please try again.",
     "SESSION_EXPIRED": "This investigation has expired. Please start a new one.",
@@ -253,7 +255,7 @@
   },
   "validation": {
     "imageType": "Choose a JPEG, PNG, or WebP image.",
-    "imageSize": "Images must be 5 MB or smaller.",
+    "imageSize": "Images must be 4 MB or smaller.",
     "questionMin": "Enter at least 3 characters.",
     "questionMax": "Use 2,000 characters or fewer."
   },

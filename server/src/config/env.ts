@@ -28,7 +28,7 @@ function parseImageStorageProvider(value: string | undefined): 'local' | 'cloudi
 
 export const env = {
   port: parsePort(process.env.PORT),
-  clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
+  clientUrl: process.env.CLIENT_URL?.trim() || 'http://localhost:5173',
   imageStorageProvider: parseImageStorageProvider(process.env.IMAGE_STORAGE_PROVIDER),
   cloudinary: {
     cloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() ?? '',

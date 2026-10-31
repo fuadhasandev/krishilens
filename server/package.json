@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/dev.ts",
     "build": "tsc && node scripts/copyAgentAssets.mjs",
-    "start": "node dist/index.js",
+    "start": "node dist/dev.js",
     "typecheck": "tsc --noEmit",
     "test": "IMAGE_STORAGE_PROVIDER=local tsx --test test/*.test.ts",
     "test:cloudinary": "tsx --test test/cloudinary.integration.test.ts"

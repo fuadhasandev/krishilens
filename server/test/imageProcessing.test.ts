@@ -159,11 +159,11 @@ test('returns 400 for unsupported and corrupted uploads', async () => {
   assert.equal(corrupted.status, 400)
 })
 
-test('returns 413 for uploads above the five-megabyte limit', async () => {
+test('returns 413 for uploads above the four-megabyte limit', async () => {
   const oversized = await postImage(
-    Buffer.alloc(5 * 1024 * 1024 + 1),
+    Buffer.alloc(4 * 1024 * 1024 + 1),
     'large.png',
   )
   assert.equal(oversized.status, 413)
-  assert.match((await oversized.json()).error, /5 MB/i)
+  assert.match((await oversized.json()).error, /4 MB/i)
 })

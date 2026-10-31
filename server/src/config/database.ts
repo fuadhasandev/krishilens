@@ -194,6 +194,8 @@ export async function connectDatabase(
 
   connection ??= mongoose.connect(uri, {
     serverSelectionTimeoutMS: 10_000,
+    maxPoolSize: 10,
+    minPoolSize: 0,
   }).catch((error: unknown) => {
     connection = undefined
     const diagnostics = summarizeMongoError(error)

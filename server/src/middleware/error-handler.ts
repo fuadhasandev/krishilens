@@ -28,7 +28,7 @@ export const errorHandler: ErrorRequestHandler = (error, _request, response, _ne
     const statusCode = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400
     const message =
       error.code === 'LIMIT_FILE_SIZE'
-        ? 'Image must be 5 MB or smaller.'
+        ? 'Image must be 4 MB or smaller.'
         : 'The image upload is invalid. Upload one image and try again.'
     response.status(statusCode).json({
       success: false,

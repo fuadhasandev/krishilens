@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/index.ts": {
+      "maxDuration": 300,
+      "includeFiles": ["src/agent/systemPrompt.md"]
+    }
+  }
+}

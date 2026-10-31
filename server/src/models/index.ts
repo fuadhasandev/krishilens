@@ -90,7 +90,7 @@ interface RecheckRecord {
   assessment: {
     language: 'bn' | 'en'
     text: string
-    generatedBy: 'muse-spark-1.3' | 'fallback'
+    generatedBy: 'muse-spark-1.3' | 'fallback' | 'built_in'
   }
   status: 'completed'
   createdAt: Date
@@ -226,7 +226,7 @@ const recheckSchema = new Schema<RecheckRecord>(
     assessment: {
       language: { type: String, enum: ['bn', 'en'], required: true },
       text: { type: String, required: true, maxlength: 2000 },
-      generatedBy: { type: String, enum: ['muse-spark-1.3', 'fallback'], required: true },
+      generatedBy: { type: String, enum: ['muse-spark-1.3', 'fallback', 'built_in'], required: true },
     },
     status: { type: String, enum: ['completed'], default: 'completed' },
   },

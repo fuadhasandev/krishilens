@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { loadScanImage, scheduleRecheck, submitRecheck } from '../services/cases'
 import { formatCaseDate } from '../utils/caseHistory'
+import { isSupportedImageUpload } from '../utils/imageUpload'
 import type { CaseRecheck, CaseScan, CropCase } from '../types/cases'
 
 export function CaseCard({ cropCase }: { cropCase: CropCase }) {
@@ -145,7 +146,9 @@ export function ProgressAssessment({ recheck }: { recheck: CaseRecheck }) {
     <aside className="rounded-xl border border-[#dce6d6] bg-[#f1f5ed] p-4">
       <h3 className="font-semibold">{t('caseHistory.progressAssessment')}</h3>
       <p className="mt-2 text-sm leading-6">{recheck.assessment.text}</p>
-      {recheck.assessment.generatedBy === 'fallback' && (
+      {recheck.comparison === null ? (
+        <p className="mt-2 text-xs text-[#617166]">{t('caseHistory.noComparisonNote')}</p>
+      ) : recheck.assessment.generatedBy === 'fallback' && (
         <p className="mt-2 text-xs text-[#617166]">{t('caseHistory.modelFallback')}</p>
       )}
       {recheck.assessment.language !== (i18n.language === 'en' ? 'en' : 'bn') && (
@@ -299,7 +302,27 @@ export function RecheckForm({
       </div>
       <label className="block text-sm font-medium">
         {t('caseHistory.chooseImage')}
-        <input accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm" onChange={(event) => setImage(event.target.files?.[0] ?? null)} required type="file" />
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          className="mt-2 block w-full text-sm"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (!file) {
+              setImage(null)
+              return
+            }
+            if (!isSupportedImageUpload(file)) {
+              setImage(null)
+              setError('INVALID_IMAGE')
+              event.currentTarget.value = ''
+              return
+            }
+            setImage(file)
+            setError('')
+          }}
+          required
+          type="file"
+        />
       </label>
       <label className="block text-sm font-medium">
         {t('caseHistory.observations')}

@@ -52,7 +52,11 @@ export interface CaseRecheck {
     assessment: 'possible_improvement' | 'possible_worsening' | 'inconclusive'
     reasons: string[]
   } | null
-  assessment: { language: 'bn' | 'en'; text: string; generatedBy: string }
+  assessment: {
+    language: 'bn' | 'en'
+    text: string
+    generatedBy: 'muse-spark-1.3' | 'fallback' | 'built_in'
+  }
 }
 
 export interface CaseDetailsResponse {

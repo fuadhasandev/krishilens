@@ -5,7 +5,7 @@ export async function explainProgress(
   comparison: ScanComparison | null,
   observations: string,
   language: 'bn' | 'en',
-): Promise<{ text: string; generatedBy: 'muse-spark-1.3' | 'fallback' }> {
+): Promise<{ text: string; generatedBy: 'muse-spark-1.3' | 'fallback' | 'built_in' }> {
   const fallback = language === 'bn'
     ? comparison
       ? 'ছবির তুলনা থেকে নিশ্চিতভাবে গাছের সুস্থতা বা চিকিৎসার ফল বোঝা যায় না। একই গাছ ও একই পাতার অংশের আরও ছবি এবং নতুন লক্ষণ পর্যবেক্ষণ করুন; প্রয়োজনে স্থানীয় কৃষি কর্মকর্তার পরামর্শ নিন।'
@@ -15,7 +15,7 @@ export async function explainProgress(
       : 'There is no earlier scan available for comparison. Keep this image and photograph the same plant and leaf area at the next check.'
 
   if (!comparison) {
-    return { text: fallback, generatedBy: 'fallback' }
+    return { text: fallback, generatedBy: 'built_in' }
   }
 
   try {

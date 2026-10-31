@@ -88,6 +88,12 @@ export function DamageResult({ result }: DamageResultProps) {
         </p>
       )}
 
+      {result.responseTruncated && (
+        <p className="rounded-xl border border-[#eee2bd] bg-[#fffaf0] p-4 text-sm leading-6 text-[#705c2f]">
+          {t('imageAnalysis.responseSizeNotice')}
+        </p>
+      )}
+
       <p className="text-xs leading-5 text-[#7b887e]">
         {t('imageAnalysis.caution')}
       </p>

@@ -1,12 +1,13 @@
 import axios from 'axios'
+import { apiBaseUrl } from './apiBaseUrl'
 import type {
   ImageAnalysisRequest,
   ImageAnalysisResponse,
 } from '../types/imageAnalysis'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:3000',
-  timeout: 190_000,
+  baseURL: apiBaseUrl,
+  timeout: 290_000,
 })
 
 export function createImageAnalysisFormData(

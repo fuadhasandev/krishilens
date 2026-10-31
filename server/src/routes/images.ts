@@ -5,11 +5,13 @@ import { ImageValidationError, processUploadedImage } from '../services/imagePro
 import { SAM_MODEL, SamServiceError, segmentCropImage } from '../services/sam.js'
 import { scanStore } from '../agent/scanStore.js'
 import { TemporaryStoreCapacityError } from '../agent/storeErrors.js'
+import { MAX_IMAGE_UPLOAD_BYTES } from '../config/uploads.js'
+import { fitSegmentResponse } from '../services/segmentResponse.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: MAX_IMAGE_UPLOAD_BYTES,
     files: 1,
     fields: 3,
     parts: 4,
@@ -63,7 +65,7 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
       parsed.data.target,
       result,
     )
-    response.json({ ...result, scanId, scanAccessToken: accessToken })
+    response.json(fitSegmentResponse({ ...result, scanId, scanAccessToken: accessToken }))
   } catch (error) {
     if (error instanceof TemporaryStoreCapacityError) {
       response.status(503).json({

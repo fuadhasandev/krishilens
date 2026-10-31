@@ -54,7 +54,7 @@ async function startApiProcess(): Promise<{ child: ChildProcess; baseUrl: string
   const port = await availablePort()
   const child = spawn(
     process.execPath,
-    ['--import', 'tsx', 'src/index.ts'],
+    ['--import', 'tsx', 'src/dev.ts'],
     {
       cwd: process.cwd(),
       env: { ...process.env, PORT: String(port) },

@@ -26,6 +26,7 @@ export interface ImageAnalysisResponse {
   scanId: string
   scanAccessToken: string
   warning?: string
+  responseTruncated?: boolean
 }
 
 export interface ImageAnalysisRequest {
