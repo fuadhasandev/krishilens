@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import {
   connectDatabase,
@@ -15,12 +16,12 @@ test('database connection reports missing MongoDB configuration without connecti
 
 test('a first re-check can persist without a previous comparison', async () => {
   const record = new RecheckModel({
-    recheckId: '123e4567-e89b-42d3-a456-426614174000',
-    submissionId: '123e4567-e89b-42d3-a456-426614174001',
-    caseId: '123e4567-e89b-42d3-a456-426614174002',
-    ownerId: '123e4567-e89b-42d3-a456-426614174003',
+    recheckId: randomUUID(),
+    submissionId: randomUUID(),
+    caseId: randomUUID(),
+    ownerId: randomUUID(),
     previousScanId: null,
-    currentScanId: '123e4567-e89b-42d3-a456-426614174004',
+    currentScanId: randomUUID(),
     intendedDate: null,
     completedAt: new Date(),
     observations: '',

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +9,7 @@ import { LocalPrivateImageStorage } from '../src/services/privateImageStorage.js
 test('local private image storage writes, reads, and removes image bytes', async () => {
   const root = await mkdtemp(join(tmpdir(), 'krishilens-images-'))
   const storage = new LocalPrivateImageStorage(root)
-  const key = '123e4567-e89b-42d3-a456-426614174000/123e4567-e89b-42d3-a456-426614174001/123e4567-e89b-42d3-a456-426614174002.jpg'
+  const key = `${randomUUID()}/${randomUUID()}/${randomUUID()}.jpg`
   try {
     await storage.put(key, Buffer.from('private image bytes'))
     assert.equal((await storage.get(key)).toString(), 'private image bytes')

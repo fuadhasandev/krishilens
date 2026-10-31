@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import test from 'node:test'
 import type OpenAI from 'openai'
@@ -379,7 +380,7 @@ test('an unvalidated affected-area measurement remains null in scan observations
 
 test('missing scan observations stop before any model request', async () => {
   const sessions = new InMemorySessionStore()
-  const session = createTestSession(sessions, '123e4567-e89b-42d3-a456-426614174000')
+  const session = createTestSession(sessions, randomUUID())
   let modelCalled = false
 
   await runAgentLoop(session, {
@@ -535,7 +536,7 @@ test('supported claims cannot use the BRRI institutional portal as symptom evide
 
 test('session access tokens isolate investigations', () => {
   const sessions = new InMemorySessionStore()
-  const firstScanId = '123e4567-e89b-42d3-a456-426614174000'
+  const firstScanId = randomUUID()
   const { session, accessToken } = sessions.create({
     scanId: firstScanId,
     crop: 'rice',
@@ -550,13 +551,15 @@ test('session access tokens isolate investigations', () => {
     toolCallFingerprints: [],
   })
 
+  const otherSessionId = randomUUID()
+
   assert.equal(sessions.getAuthorized(session.id, accessToken)?.id, session.id)
   assert.equal(sessions.getAuthorized(session.id, `${accessToken}x`), null)
-  assert.equal(sessions.getAuthorized('123e4567-e89b-42d3-a456-426614174001', accessToken), null)
+  assert.equal(sessions.getAuthorized(otherSessionId, accessToken), null)
 })
 
 test('GET investigation does not disclose state without the bearer token', async () => {
-  const scanId = '123e4567-e89b-42d3-a456-426614174000'
+  const scanId = randomUUID()
   const { session, accessToken } = await sessionStore.create({
     scanId,
     crop: 'rice',
