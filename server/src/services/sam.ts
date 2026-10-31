@@ -414,7 +414,9 @@ export async function segmentCropImage(
   )
   const warnings = [...leafResult.warnings, ...affectedResult.warnings]
   const uncertain =
-    leafResult.requiresReview || affectedResult.requiresReview
+    leafResult.requiresReview ||
+    affectedResult.requiresReview ||
+    measurement.status === 'needs_review'
 
   const overlay = leafUnion
     ? await renderSegmentationOverlay(

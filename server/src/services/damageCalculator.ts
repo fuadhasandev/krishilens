@@ -99,6 +99,15 @@ export function calculateAffectedArea(
     affectedPixelCount += leaf[index]! & affected[index]!
   }
 
+  if (affectedPixelCount === 0) {
+    return {
+      leafPixelCount,
+      affectedPixelCount: null,
+      percentage: null,
+      status: 'needs_review',
+    }
+  }
+
   return {
     leafPixelCount,
     affectedPixelCount,

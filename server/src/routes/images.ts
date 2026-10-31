@@ -3,6 +3,8 @@ import multer from 'multer'
 import { z } from 'zod'
 import { ImageValidationError, processUploadedImage } from '../services/imageProcessing.js'
 import { SAM_MODEL, SamServiceError, segmentCropImage } from '../services/sam.js'
+import { scanStore } from '../agent/scanStore.js'
+import { TemporaryStoreCapacityError } from '../agent/storeErrors.js'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -23,6 +25,10 @@ const segmentRequestSchema = z.object({
 }).strict()
 
 export const imagesRouter = Router()
+imagesRouter.use((_request, response, next) => {
+  response.setHeader('Cache-Control', 'no-store')
+  next()
+})
 
 imagesRouter.post('/images/segment', upload.single('image'), async (request, response) => {
   if (!request.file) {
@@ -49,8 +55,21 @@ imagesRouter.post('/images/segment', upload.single('image'), async (request, res
       parsed.data.crop,
       parsed.data.target,
     )
-    response.json(result)
+    const { scanId, accessToken } = scanStore.create(
+      parsed.data.crop,
+      parsed.data.target,
+      result,
+    )
+    response.json({ ...result, scanId, scanAccessToken: accessToken })
   } catch (error) {
+    if (error instanceof TemporaryStoreCapacityError) {
+      response.status(503).json({
+        success: false,
+        error: 'Temporary scan storage is busy. Please try again later.',
+      })
+      return
+    }
+
     if (error instanceof ImageValidationError) {
       response.status(400).json({ success: false, error: error.message })
       return

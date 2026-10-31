@@ -79,12 +79,26 @@ test('returns needs_review and no percentage for invalid affected masks', () => 
   })
 })
 
-test('a valid but empty affected mask calculates a zero percentage', () => {
+test('a valid but disjoint affected mask is unavailable for review', () => {
   const leaf = mask(4, [1, 1, 1, 1])
   const affected = mask(4, [0, 0, 0, 0])
 
-  assert.equal(
-    calculateAffectedArea(4, 1, [leaf], [affected]).percentage,
-    0,
-  )
+  assert.deepEqual(calculateAffectedArea(4, 1, [leaf], [affected]), {
+    leafPixelCount: 4,
+    affectedPixelCount: null,
+    percentage: null,
+    status: 'needs_review',
+  })
+})
+
+test('a candidate mask entirely outside the leaf is not zero damage', () => {
+  const leaf = mask(4, [1, 1, 0, 0])
+  const candidate = mask(4, [0, 0, 1, 1])
+
+  assert.deepEqual(calculateAffectedArea(4, 1, [leaf], [candidate]), {
+    leafPixelCount: 2,
+    affectedPixelCount: null,
+    percentage: null,
+    status: 'needs_review',
+  })
 })

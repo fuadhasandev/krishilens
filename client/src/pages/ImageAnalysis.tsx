@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Image as ImageIcon, LoaderCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { DamageResult } from '../components/DamageResult'
+import { AgentInvestigation } from '../components/AgentInvestigation'
 import { ImageUploader } from '../components/ImageUploader'
 import { SegmentationViewer } from '../components/SegmentationViewer'
 import { analyzeImage } from '../services/imageAnalysis'
@@ -195,6 +196,12 @@ export function ImageAnalysis() {
                 />
               )}
               <DamageResult result={result} />
+              <AgentInvestigation
+                crop={crop}
+                key={result.scanId}
+                scanAccessToken={result.scanAccessToken}
+                scanId={result.scanId}
+              />
             </div>
           )}
         </div>

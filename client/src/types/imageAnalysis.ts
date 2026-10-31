@@ -23,6 +23,8 @@ export interface ImageAnalysisResponse {
   }>
   overlay: { imageUrl: string | null }
   requestIds: string[]
+  scanId: string
+  scanAccessToken: string
   warning?: string
 }
 
