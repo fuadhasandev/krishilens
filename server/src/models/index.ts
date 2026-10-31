@@ -1,5 +1,6 @@
 import mongoose, { Schema, model, type Model } from 'mongoose'
 import type { AgentSession } from '../agent/types.js'
+import type { PrivateImageReference } from '../services/privateImageStorage.js'
 import type { SamAnalysis } from '../services/sam.js'
 
 interface CaseRecord {
@@ -20,7 +21,7 @@ interface ScanRecord {
   scanId: string
   caseId: string
   ownerId: string
-  imageRef: string
+  imageRef: PrivateImageReference
   image: { width: number; height: number }
   samModel: string
   leafDetected: boolean
@@ -135,7 +136,7 @@ const scanSchema = new Schema<ScanRecord>(
     scanId: { type: String, required: true, unique: true, index: true },
     caseId: { type: String, required: true, index: true },
     ownerId: { type: String, required: true, index: true },
-    imageRef: { type: String, required: true },
+    imageRef: { type: Schema.Types.Mixed, required: true },
     image: {
       width: { type: Number, required: true },
       height: { type: Number, required: true },

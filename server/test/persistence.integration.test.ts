@@ -5,8 +5,12 @@ import { once } from 'node:events'
 import { createServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import test from 'node:test'
+import express from 'express'
 import mongoose from 'mongoose'
+import multer from 'multer'
+import sharp from 'sharp'
 import { app } from '../src/app.js'
+import { createRecheckHandler } from '../src/routes/cases.js'
 import { connectDatabase, disconnectDatabase } from '../src/config/database.js'
 import { useMongoScanStore, MongoScanStore } from '../src/agent/scanStore.js'
 import {
@@ -23,7 +27,11 @@ import {
   ScanModel,
   TraceModel,
 } from '../src/models/index.js'
-import { privateImageStorage } from '../src/services/privateImageStorage.js'
+import {
+  privateImageStorage,
+  type PrivateImageReference,
+  type PrivateImageStorage,
+} from '../src/services/privateImageStorage.js'
 import type { SamAnalysis } from '../src/services/sam.js'
 
 import '../src/config/env.js'
@@ -101,7 +109,7 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     agentScanIds: [] as string[],
     investigationIds: [] as string[],
   }
-  const imageRefs: string[] = []
+  const imageRefs: PrivateImageReference[] = []
   let server = instance
   let apiProcess: ChildProcess | undefined
 
@@ -153,11 +161,30 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     })
     assert.equal(caseResponse.status, 200)
 
+    const unauthenticatedRecheck = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/recheck`,
+      { method: 'POST' },
+    )
+    assert.equal(unauthenticatedRecheck.status, 401)
+    const authenticatedRecheckWithoutImage = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/recheck`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${ownerToken}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': randomUUID(),
+        },
+        body: JSON.stringify({ language: 'en' }),
+      },
+    )
+    assert.equal(authenticatedRecheckWithoutImage.status, 400)
+
     const scanId = randomUUID()
-    const imageRef = `${owner.ownerId}/${caseId}/${scanId}.jpg`
-    imageRefs.push(imageRef)
     const imageBytes = Buffer.from('protected test image fixture')
-    await privateImageStorage.put(imageRef, imageBytes)
+    const imageKey = `${owner.ownerId}/${caseId}/${scanId}.jpg`
+    const imageRef = await privateImageStorage.put(imageKey, imageBytes)
+    imageRefs.push(imageRef)
     await ScanModel.create({
       scanId,
       caseId,
@@ -193,6 +220,188 @@ test('MongoDB persists case, scan image, re-check, and awaiting agent state acro
     )
     assert.equal(imageResponse.status, 200)
     assert.deepEqual(Buffer.from(await imageResponse.arrayBuffer()), imageBytes)
+    const unauthorizedImage = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/scans/${scanId}/image`,
+    )
+    assert.equal(unauthorizedImage.status, 401)
+    const otherOwnerImage = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/scans/${scanId}/image`,
+      { headers: { Authorization: `Bearer ${otherOwnerBody.ownerAccessToken}` } },
+    )
+    assert.equal(otherOwnerImage.status, 404)
+    const otherCaseImage = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${otherOwnerBody.case.caseId}/scans/${scanId}/image`,
+      { headers: { Authorization: `Bearer ${ownerToken}` } },
+    )
+    assert.equal(otherCaseImage.status, 404)
+
+    const mismatchedImageScanId = randomUUID()
+    await ScanModel.create({
+      scanId: mismatchedImageScanId,
+      caseId,
+      ownerId: owner.ownerId,
+      imageRef,
+      image: { width: 1200, height: 900 },
+      samModel: 'sam-3.1',
+      leafDetected: false,
+      leafPixelCount: null,
+      affectedPixelCount: null,
+      affectedPercent: null,
+      measurementQuality: 'unavailable',
+    })
+    cleanupIds.scanIds.push(mismatchedImageScanId)
+    const mismatchedImageResponse = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/scans/${mismatchedImageScanId}/image`,
+      { headers: { Authorization: `Bearer ${ownerToken}` } },
+    )
+    assert.equal(mismatchedImageResponse.status, 404)
+
+    const missingImageScanId = randomUUID()
+    await ScanModel.create({
+      scanId: missingImageScanId,
+      caseId,
+      ownerId: owner.ownerId,
+      imageRef: `${owner.ownerId}/${caseId}/${missingImageScanId}.jpg`,
+      image: { width: 1200, height: 900 },
+      samModel: 'sam-3.1',
+      leafDetected: false,
+      leafPixelCount: null,
+      affectedPixelCount: null,
+      affectedPercent: null,
+      measurementQuality: 'unavailable',
+    })
+    cleanupIds.scanIds.push(missingImageScanId)
+    const missingImageResponse = await fetch(
+      `http://127.0.0.1:${address.port}/api/cases/${caseId}/scans/${missingImageScanId}/image`,
+      { headers: { Authorization: `Bearer ${ownerToken}` } },
+    )
+    assert.equal(missingImageResponse.status, 404)
+    assert.equal(
+      (await missingImageResponse.json() as { errorCode: string }).errorCode,
+      'IMAGE_NOT_FOUND',
+    )
+
+    const rollbackCaseId = randomUUID()
+    cleanupIds.caseIds.push(rollbackCaseId)
+    await CaseModel.create({
+      caseId: rollbackCaseId,
+      ownerId: owner.ownerId,
+      crop: 'rice',
+      language: 'en',
+      status: 'active',
+      scanIds: [],
+      lastScanAt: null,
+      nextRecheckAt: null,
+    })
+
+    const failedSubmissionId = randomUUID()
+    const conflictingRecheckId = randomUUID()
+    cleanupIds.recheckIds.push(conflictingRecheckId)
+    await RecheckModel.create({
+      recheckId: conflictingRecheckId,
+      submissionId: failedSubmissionId,
+      caseId: otherOwnerBody.case.caseId,
+      ownerId: otherOwner.ownerId,
+      previousScanId: null,
+      currentScanId: randomUUID(),
+      intendedDate: null,
+      completedAt: new Date(),
+      observations: '',
+      comparison: null,
+      assessment: {
+        language: 'en',
+        text: 'No prior scan is available.',
+        generatedBy: 'fallback',
+      },
+      status: 'completed',
+    })
+
+    const rollbackImage = await sharp({
+      create: {
+        width: 1,
+        height: 1,
+        channels: 3,
+        background: { r: 24, g: 128, b: 48 },
+      },
+    }).png().toBuffer()
+    const storedRollbackRefs: PrivateImageReference[] = []
+    const removedRollbackRefs: PrivateImageReference[] = []
+    const rollbackStorage: PrivateImageStorage = {
+      put: async (key, bytes, contentType) => {
+        const reference = await privateImageStorage.put(key, bytes, contentType)
+        storedRollbackRefs.push(reference)
+        return reference
+      },
+      get: (reference) => privateImageStorage.get(reference),
+      remove: async (reference) => {
+        removedRollbackRefs.push(reference)
+        await privateImageStorage.remove(reference)
+      },
+    }
+    const rollbackAnalysis: SamAnalysis = {
+      success: true,
+      model: 'sam-3.1',
+      image: { width: 1, height: 1 },
+      leaf: { detected: false, pixelCount: null },
+      affectedArea: { pixelCount: null, percentage: null, status: 'unavailable' },
+      objects: [],
+      overlay: { imageUrl: null },
+      requestIds: [],
+    }
+    const rollbackApp = express()
+    rollbackApp.post(
+      '/cases/:caseId/recheck',
+      multer({ storage: multer.memoryStorage() }).single('image'),
+      createRecheckHandler({
+        storage: rollbackStorage,
+        segmenter: async () => rollbackAnalysis,
+      }),
+    )
+    const rollbackServer = rollbackApp.listen(0)
+    await once(rollbackServer, 'listening')
+    const rollbackAddress = rollbackServer.address()
+    assert.ok(rollbackAddress && typeof rollbackAddress !== 'string')
+    try {
+      const uploadForm = new FormData()
+      uploadForm.set('language', 'en')
+      uploadForm.set('observations', '')
+      uploadForm.set('image', new Blob([rollbackImage], { type: 'image/png' }), 'rollback.png')
+      const failedRecheck = await fetch(
+        `http://127.0.0.1:${rollbackAddress.port}/cases/${rollbackCaseId}/recheck`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${ownerToken}`,
+            'Idempotency-Key': failedSubmissionId,
+          },
+          body: uploadForm,
+        },
+      )
+      assert.equal(failedRecheck.status, 503)
+      assert.equal(
+        (await failedRecheck.json() as { errorCode: string }).errorCode,
+        'PERSISTENCE_FAILED',
+      )
+    } finally {
+      const closed = new Promise<void>((resolve, reject) => {
+        rollbackServer.close((error) => error ? reject(error) : resolve())
+      })
+      rollbackServer.closeAllConnections()
+      await closed
+    }
+    assert.equal(storedRollbackRefs.length, 1)
+    assert.deepEqual(removedRollbackRefs, storedRollbackRefs)
+    const rolledBackReference = storedRollbackRefs[0]
+    assert.ok(rolledBackReference)
+    await assert.rejects(rollbackStorage.get(rolledBackReference))
+    const failedScanId = typeof rolledBackReference === 'string'
+      ? rolledBackReference.split('/').at(-1)?.replace(/\.(?:jpg|png|webp)$/, '')
+      : rolledBackReference.publicId.split('/').at(-1)
+    assert.ok(failedScanId)
+    assert.equal(
+      await ScanModel.exists({ scanId: failedScanId, ownerId: owner.ownerId }),
+      null,
+    )
 
     const recheckId = randomUUID()
     cleanupIds.recheckIds.push(recheckId)

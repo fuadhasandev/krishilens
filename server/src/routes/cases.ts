@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
-import { Router, type Response } from 'express'
+import { pipeline } from 'node:stream/promises'
+import { Router, type RequestHandler, type Response } from 'express'
 import multer from 'multer'
 import { z } from 'zod'
 import {
@@ -12,7 +13,13 @@ import {
 import { rateLimit } from '../middleware/rateLimit.js'
 import { ImageValidationError, processUploadedImage } from '../services/imageProcessing.js'
 import { explainProgress } from '../services/progressAssessment.js'
-import { privateImageStorage } from '../services/privateImageStorage.js'
+import {
+  PrivateImageNotFoundError,
+  PrivateImageStorageError,
+  privateImageStorage,
+  type PrivateImageReference,
+  type PrivateImageStorage,
+} from '../services/privateImageStorage.js'
 import { SAM_MODEL, SamServiceError, segmentCropImage } from '../services/sam.js'
 import { compareScans, type ComparableScan, type ScanComparison } from '../services/scanComparison.js'
 
@@ -158,6 +165,21 @@ function comparableScan(scan: {
     height: scan.image.height,
     imageQuality: scan.imageQuality,
   }
+}
+
+function imageReferenceBelongsToScan(
+  reference: PrivateImageReference,
+  ownerId: string,
+  caseId: string,
+  scanId: string,
+): boolean {
+  if (typeof reference === 'string') {
+    return ['jpg', 'png', 'webp'].some(
+      (extension) => reference === `${ownerId}/${caseId}/${scanId}.${extension}`,
+    )
+  }
+  return reference.provider === 'cloudinary' &&
+    reference.publicId === `krishilens/${ownerId}/${caseId}/${scanId}`
 }
 
 export const casesRouter = Router()
@@ -367,6 +389,14 @@ casesRouter.get('/cases/:caseId/scans/:scanId/image', async (request, response) 
     response.status(404).json({ success: false, errorCode: 'SCAN_NOT_FOUND', error: 'This scan is unavailable.' })
     return
   }
+  const cropCase = await CaseModel.exists({
+    caseId: caseId.data,
+    ownerId: owner.ownerId,
+  })
+  if (!cropCase) {
+    response.status(404).json({ success: false, errorCode: 'SCAN_NOT_FOUND', error: 'This scan is unavailable.' })
+    return
+  }
   const scan = await ScanModel.findOne({
     caseId: caseId.data,
     scanId: scanId.data,
@@ -376,21 +406,45 @@ casesRouter.get('/cases/:caseId/scans/:scanId/image', async (request, response) 
     response.status(404).json({ success: false, errorCode: 'SCAN_NOT_FOUND', error: 'This scan is unavailable.' })
     return
   }
+  if (!imageReferenceBelongsToScan(scan.imageRef, owner.ownerId, caseId.data, scanId.data)) {
+    response.status(404).json({ success: false, errorCode: 'SCAN_NOT_FOUND', error: 'This scan is unavailable.' })
+    return
+  }
   try {
-    const buffer = await privateImageStorage.get(scan.imageRef)
-    response.type(scan.imageRef.endsWith('.jpg') ? 'image/jpeg' : scan.imageRef.endsWith('.png') ? 'image/png' : 'image/webp')
+    const image = await privateImageStorage.get(scan.imageRef)
+    response.type(image.contentType)
     response.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
-    response.send(buffer)
-  } catch {
-    response.status(404).json({ success: false, errorCode: 'IMAGE_NOT_FOUND', error: 'The saved image is unavailable.' })
+    response.setHeader('X-Content-Type-Options', 'nosniff')
+    await pipeline(image.stream, response)
+  } catch (error) {
+    if (error instanceof PrivateImageNotFoundError) {
+      response.status(404).json({ success: false, errorCode: 'IMAGE_NOT_FOUND', error: 'The saved image is unavailable.' })
+      return
+    }
+    if (response.headersSent) {
+      response.destroy(error instanceof Error ? error : undefined)
+      return
+    }
+    console.error('Private image retrieval failed.', {
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+      storageError: error instanceof PrivateImageStorageError,
+    })
+    response.status(502).json({
+      success: false,
+      errorCode: 'IMAGE_STORAGE_UNAVAILABLE',
+      error: 'The saved image is temporarily unavailable.',
+    })
   }
 })
 
-casesRouter.post(
-  '/cases/:caseId/recheck',
-  rateLimit(5, 10 * 60 * 1000),
-  upload.single('image'),
-  async (request, response) => {
+export function createRecheckHandler({
+  storage = privateImageStorage,
+  segmenter = segmentCropImage,
+}: {
+  storage?: PrivateImageStorage
+  segmenter?: typeof segmentCropImage
+} = {}): RequestHandler {
+  return async (request, response) => {
     const owner = await findOwner(getBearerToken(request.get('authorization')))
     if (!owner) {
       response.status(401).json({ success: false, errorCode: 'UNAUTHORIZED', error: 'A valid case access token is required.' })
@@ -437,11 +491,12 @@ casesRouter.post(
     const scanId = randomUUID()
     const recheckId = randomUUID()
     const extension = image.mimeType === 'image/jpeg' ? 'jpg' : image.mimeType === 'image/png' ? 'png' : 'webp'
-    const imageRef = `${owner.ownerId}/${cropCase.caseId}/${scanId}.${extension}`
+    const imageKey = `${owner.ownerId}/${cropCase.caseId}/${scanId}.${extension}`
+    let imageRef: PrivateImageReference = imageKey
     let storedImage = false
     try {
-      const analysis = await segmentCropImage(image, cropCase.crop, 'brown spots')
-      await privateImageStorage.put(imageRef, image.buffer)
+      const analysis = await segmenter(image, cropCase.crop, 'brown spots')
+      imageRef = await storage.put(imageKey, image.buffer, image.mimeType)
       storedImage = true
       const priorScanFilter = {
         caseId: cropCase.caseId,
@@ -452,7 +507,7 @@ casesRouter.post(
         .sort({ createdAt: -1 })
         .lean()
       if (body.data.previousScanId && !previous) {
-        await privateImageStorage.remove(imageRef)
+        await storage.remove(imageRef)
         response.status(404).json({ success: false, errorCode: 'PREVIOUS_SCAN_NOT_FOUND', error: 'The selected comparison scan is unavailable.' })
         return
       }
@@ -524,7 +579,7 @@ casesRouter.post(
       })
     } catch (error) {
       const cleanupResults = await Promise.allSettled([
-        ...(storedImage ? [privateImageStorage.remove(imageRef)] : []),
+        ...(storedImage ? [storage.remove(imageRef)] : []),
         ScanModel.deleteOne({ scanId, ownerId: owner.ownerId }),
         RecheckModel.deleteOne({ recheckId, ownerId: owner.ownerId }),
       ])
@@ -566,5 +621,12 @@ casesRouter.post(
         error: 'The re-check could not be saved. Please try again.',
       })
     }
-  },
+  }
+}
+
+casesRouter.post(
+  '/cases/:caseId/recheck',
+  rateLimit(5, 10 * 60 * 1000),
+  upload.single('image'),
+  createRecheckHandler(),
 )

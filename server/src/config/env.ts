@@ -16,7 +16,23 @@ function parsePort(value: string | undefined): number {
   return port
 }
 
+function parseImageStorageProvider(value: string | undefined): 'local' | 'cloudinary' {
+  if (value === undefined || value === '') {
+    return 'local'
+  }
+  if (value === 'local' || value === 'cloudinary') {
+    return value
+  }
+  throw new Error('IMAGE_STORAGE_PROVIDER must be either "local" or "cloudinary".')
+}
+
 export const env = {
   port: parsePort(process.env.PORT),
   clientUrl: process.env.CLIENT_URL ?? 'http://localhost:5173',
+  imageStorageProvider: parseImageStorageProvider(process.env.IMAGE_STORAGE_PROVIDER),
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME?.trim() ?? '',
+    apiKey: process.env.CLOUDINARY_API_KEY?.trim() ?? '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET?.trim() ?? '',
+  },
 }

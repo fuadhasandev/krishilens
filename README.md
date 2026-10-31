@@ -57,6 +57,10 @@ Requirements: Node.js 20.19+ and npm.
 | `META_BASE_URL` | Meta Model API base URL | Defaults to `https://api.meta.ai/v1` |
 | `MONGODB_URI` | MongoDB connection string | Required by the API; startup fails clearly if missing or unreachable |
 | `LOCAL_IMAGE_STORAGE_DIR` | Private local image directory | Development-only adapter; defaults to `./data/private-images` from the server directory |
+| `IMAGE_STORAGE_PROVIDER` | Private image adapter (`local` or `cloudinary`) | Defaults to `local` for development; production requires `cloudinary` |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | Required with the `cloudinary` provider; server-side only |
+| `CLOUDINARY_API_KEY` | Cloudinary API key | Required with the `cloudinary` provider; server-side only |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret | Required with the `cloudinary` provider; server-side only |
 | `VITE_API_URL` | Backend origin used by the browser | Optional; defaults to `http://localhost:3000`. Never place secrets in `VITE_*` variables. |
 
 ## Development commands
@@ -68,6 +72,8 @@ Run these from the repository root:
 | `npm run dev` | Run the Vite frontend and `tsx` backend together |
 | `npm run build` | Build the frontend and compile the backend |
 | `npm run typecheck` | Check both TypeScript projects (the client check also produces its production build) |
+
+To run the optional real Cloudinary integration test, set `IMAGE_STORAGE_PROVIDER=cloudinary` and `RUN_CLOUDINARY_INTEGRATION_TESTS=1` in the server process environment, then run `npm run test:cloudinary` from `server/`. The test requires the Cloudinary credentials and MongoDB connection, and deletes its temporary image and records.
 | `npm test` | Run backend agent, upload, parser, mask-math, and provider error tests |
 | `npm run test --prefix client` | Run bilingual UI, locale parity, persistence, and request-language tests |
 | `npm run lint --prefix client` | Lint the frontend |
@@ -157,7 +163,7 @@ The response contains `sessionId`, the original session `language`, `accessToken
 
 The API now connects to MongoDB before listening. Set `MONGODB_URI` in `server/.env` to a MongoDB Atlas URI or a local compatible database. Connection errors report the error class only; the URI and credentials are never logged. Mongoose creates indexes for ownership, related IDs, timestamps, and expiry.
 
-The `Case`, `Scan`, `Investigation`, `Trace`, `Recheck`, `AnonymousOwner`, and `AgentScan` collections store case metadata, validated SAM measurements, protected image references, sanitized traces, assessment text, and resumable agent state. Scan images are stored outside MongoDB. Configure `LOCAL_IMAGE_STORAGE_DIR` for local development; files are private, excluded from Git, and served only through an authorized image route. This local filesystem adapter is development-only. No private cloud object-storage provider is configured, so production startup is intentionally blocked until one is added.
+The `Case`, `Scan`, `Investigation`, `Trace`, `Recheck`, `AnonymousOwner`, and `AgentScan` collections store case metadata, validated SAM measurements, protected image references, sanitized traces, assessment text, and resumable agent state. Scan images are stored outside MongoDB. Configure `IMAGE_STORAGE_PROVIDER=local` and `LOCAL_IMAGE_STORAGE_DIR` for development, or use `IMAGE_STORAGE_PROVIDER=cloudinary` with server-only Cloudinary credentials. Cloudinary uploads use the `authenticated` delivery type. The existing bearer-token and case-owner image route retrieves those assets server-side; signed download URLs are short-lived and are never returned to the browser. Existing local references remain readable by the local adapter and are not deleted during provider changes. Production startup requires the Cloudinary provider and all three credentials.
 
 Create a case with `POST /api/cases` and JSON `{ "crop": "rice", "language": "bn" }`. A first-time anonymous browser receives an `ownerAccessToken` once. The client stores it in browser local storage and sends it only as an `Authorization: Bearer` header. The database stores only its SHA-256 hash. The anonymous owner token expires after one year; clearing browser storage loses access. There is no account recovery or cross-device access.
 

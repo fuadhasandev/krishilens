@@ -8,10 +8,12 @@
     "build": "tsc && node scripts/copyAgentAssets.mjs",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "IMAGE_STORAGE_PROVIDER=local tsx --test test/*.test.ts",
+    "test:cloudinary": "tsx --test test/cloudinary.integration.test.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
+    "cloudinary": "^2.11.0",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
