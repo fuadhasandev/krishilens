@@ -131,6 +131,8 @@ test('provider request uses the selected language and validates the transcript',
   const originalFetch = globalThis.fetch
   process.env.MODEL_API_KEY = 'test-key-not-a-real-credential'
   let observedRequest: Request | undefined
+  const sourceAudio = pcmWav()
+  sourceAudio.set([0x12, 0x34, 0x56, 0x78], 44)
   globalThis.fetch = async (input, init) => {
     observedRequest = new Request(input, init)
     return new Response(JSON.stringify({ transcript: 'ধানের পাতায় দাগ' }), {
@@ -140,7 +142,7 @@ test('provider request uses the selected language and validates the transcript',
   }
 
   try {
-    assert.equal(await transcribeVoice(pcmWav(), 'bn'), 'ধানের পাতায় দাগ')
+    assert.equal(await transcribeVoice(sourceAudio, 'bn'), 'ধানের পাতায় দাগ')
     assert.ok(observedRequest)
     assert.equal(
       observedRequest.headers.get('authorization'),
@@ -160,7 +162,14 @@ test('provider request uses the selected language and validates the transcript',
       mode: 'PUSH_TO_TALK',
       languageBias: ['Bengali'],
     })
-    assert.equal((form.get('audio') as Blob).type, 'audio/wav')
+    const audioPart = form.get('audio') as File
+    assert.equal(audioPart.type, 'audio/wav')
+    assert.equal(audioPart.name, 'recording.wav')
+    assert.deepEqual(
+      Buffer.from(await audioPart.arrayBuffer()),
+      sourceAudio,
+      'multipart audio bytes exactly match the input WAV buffer',
+    )
 
     globalThis.fetch = async (input, init) => {
       observedRequest = new Request(input, init)

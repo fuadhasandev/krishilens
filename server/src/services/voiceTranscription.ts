@@ -37,10 +37,12 @@ export async function transcribeVoice(
     mode: 'PUSH_TO_TALK',
     languageBias: [language === 'bn' ? 'Bengali' : 'English'],
   })
+  const audioBytes = new Uint8Array(audio.byteLength)
+  audioBytes.set(audio)
   const body = new Blob([
     `--${boundary}\r\nContent-Disposition: form-data; name="request"\r\nContent-Type: application/json\r\n\r\n${configuration}\r\n`,
     `--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="recording.wav"\r\nContent-Type: audio/wav\r\n\r\n`,
-    audio,
+    audioBytes.buffer,
     `\r\n--${boundary}--\r\n`,
   ], { type: `multipart/form-data; boundary=${boundary}` })
 
