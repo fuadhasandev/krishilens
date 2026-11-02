@@ -1,121 +1,163 @@
-# Vercel deployment
+# Deployment and safe verification
 
-KrishiLens deploys as two independent Vercel projects connected to the same GitHub repository. The frontend is a static Vite application; the Express API is a Node.js Function. Deployments are not performed by this guide.
+KrishiLens uses separate managed services:
 
-## 1. Create the Vercel projects
-
-Create two projects from the same repository:
-
-| Setting | Frontend | Backend |
+| Component | Hosting | Production resource |
 | --- | --- | --- |
-| Root Directory | `client` | `server` |
-| Framework Preset | Vite | Express |
-| Node.js version | `22.x` | `22.x` |
-| Build Command | `npm run build` | `npm run build` |
-| Output Directory | `dist` | Leave empty; Express is deployed as a Function |
-| Install Command | `npm install` | `npm install` |
+| React/Vite frontend | Vercel | `https://krishilens-nine.vercel.app/` |
+| Express API | Render Web Service | `https://krishilens-api.onrender.com/` |
+| Cases, scans, and investigations | MongoDB Atlas | Private MongoDB database |
+| Uploaded case images | Cloudinary | `authenticated` delivery; API-authorized downloads |
+| Image and text models | Meta Model API | SAM 3.1 and Muse Spark 1.3 |
 
-Use the automatic framework settings unless the project dashboard asks for a build/output override. The backend entrypoint is `src/index.ts`, which default-exports a reusable Express application and does not call `listen()`. The local development/start command uses `src/dev.ts` / `dist/dev.js` and is the only entrypoint that opens a port. `server/vercel.json` configures a 300-second function duration and includes the investigation system prompt asset. `client/vercel.json` rewrites SPA paths to `index.html` for React Router refreshes.
+This repository does not contain a Render Blueprint. Render's service settings, selected compute plan, `NODE_VERSION` override, and deploy history are managed in the Render Dashboard. `server/vercel.json` is Vercel-specific legacy configuration; its function duration does **not** configure or extend the Render service.
 
-Deploy the backend first and copy its HTTPS origin into the frontend environment. Set the backend's `CLIENT_URL` to the frontend's exact HTTPS origin. For Preview deployments, configure matching Preview environment values; the API does not permit arbitrary origins.
+## 1. Render service settings
+
+For the API's Render Web Service, verify the following under **Settings**, **Environment**, **Compute**, **Events**, and **Logs**:
+
+| Setting | Expected value |
+| --- | --- |
+| Root directory | `server` |
+| Runtime | Node.js |
+| Build command | `npm ci && npm run build` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+| Node.js version | `22.x`, consistent with `server/package.json` |
+| Port | Use Render's injected `PORT`; do not hard-code a production port |
+
+Render's `NODE_VERSION` dashboard value takes precedence over repository version declarations. Check the deployed version in the service's deploy logs (and, if available, its Shell with `node --version`); do not infer it from the local machine or an old deploy. Render's current default can change over time, so explicitly pin the intended major version.
+
+The selected **compute plan** determines CPU and memory. Record the plan and RAM shown in the Render Dashboard; this repository cannot establish which plan the deployed service uses. Image decoding and segmentation hold bounded image buffers in memory, so monitor memory and restarts during real uploads.
+
+The server reads `PORT` and `CLIENT_URL`, checks required production configuration during startup, connects to Atlas, and then initializes Mongo-backed stores. Render must route to the port supplied through `PORT`. The health route returns 200, but it does not itself prove that every external model or image-storage request is healthy.
+
+### Runtime and request limits
+
+- Do not apply Vercel Function limits to Render. Render's request lifetime is an ingress/platform constraint, not the `maxDuration` in `server/vercel.json`; check Render's current Web Service documentation and service logs for the effective cutoff.
+- This API performs SAM and Muse calls synchronously. SAM may make sequential provider calls with per-call timeouts, and an investigation has its own execution budget. A re-check can run SAM and then Muse. Those aggregate budgets can exceed a hosted HTTP request window even when each individual provider call is bounded. A disconnected browser request is not evidence that the server-side work completed or that the result was saved.
+- The browser's long Axios timeout does not increase Render's request limit. Treat a timeout as a failed or uncertain operation and verify case history before retrying.
+- Render Free Web Services spin down after inactivity and can take about a minute to start again. Free instances have limited CPU/RAM and ephemeral local filesystems. Verify the deployed service's plan before attributing a slow first health check to application code.
+- Render runs configured HTTP health checks every few seconds and expects a 2xx/3xx response within five seconds. Use `/api/health`; review **Events** and runtime logs around restarts and failed checks.
+- Startup/configuration failures appear in deploy/runtime logs. Check `NODE_VERSION`, build output, startup validation errors, `PORT`, Atlas connectivity, and the health-check path. Mongo diagnostics are sanitized in application logs; never paste credentials or full connection strings into tickets or chat.
+
+Official Render references: [Node.js version selection](https://render.com/docs/node-version), [Web Services](https://render.com/docs/web-services), [compute plans](https://render.com/docs/compute-plans), [health checks](https://render.com/docs/health-checks), and [Free Web Service limits](https://render.com/docs/free).
 
 ## 2. Environment variables
 
-Set variables in the corresponding Vercel project's Environment Variables settings. Never use `VITE_` for a backend secret.
+Configure values in the relevant service's environment settings. Keep secrets server-side. Never use `VITE_` for a credential.
 
-### Frontend project
-
-| Variable | Value |
-| --- | --- |
-| `VITE_API_URL` | The backend's HTTPS origin, without an API path (for example, `https://your-api.example`) |
-
-This is the only frontend variable required. `VITE_API_URL` is public and is compiled into browser code. The frontend uses localhost only in Vite development mode; a production build with this variable absent does not fall back to localhost.
-
-### Backend project
+### Vercel frontend
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `MODEL_API_KEY` | Yes | Meta Model API key; server-side secret |
-| `META_BASE_URL` | No | Defaults to `https://api.meta.ai/v1` |
-| `MONGODB_URI` | Yes | Authenticated MongoDB Atlas connection URI |
-| `IMAGE_STORAGE_PROVIDER` | Yes | Set exactly to `cloudinary` |
-| `CLOUDINARY_CLOUD_NAME` | Yes | Server-side Cloudinary configuration |
-| `CLOUDINARY_API_KEY` | Yes | Server-side Cloudinary credential |
-| `CLOUDINARY_API_SECRET` | Yes | Server-side Cloudinary secret |
-| `CLIENT_URL` | Yes | Exact HTTPS origin of the frontend; one allowed CORS origin |
+| `VITE_API_URL` | Yes | Render API origin, e.g. `https://krishilens-api.onrender.com`; no `/api` path. It is public and compiled into the client bundle. |
 
-`PORT` and `LOCAL_IMAGE_STORAGE_DIR` are local-development settings, not Vercel production storage configuration. Production startup rejects missing required variables and local image storage. Do not copy secret values into source files, README, Vite variables, or logs.
+The frontend only uses `http://localhost:3000` in Vite development mode. Production builds require an HTTPS API origin.
 
-## 3. MongoDB Atlas
+### Render backend
 
-- Keep Atlas authentication and TLS enabled and use a least-privilege database user.
-- Put the backend Function in a region close to the Atlas cluster to reduce latency.
-- Allow only Vercel egress addresses that are stable and documented for the selected plan/configuration. Vercel does not provide a fixed outbound IP on every plan. If a static egress option is unavailable, choose an appropriate Vercel networking/plan option rather than opening Atlas to all IP addresses.
-- The Mongoose connection is reused in a warm Function process, has a bounded server-selection timeout, and caps its pool at 10 connections. Atlas connection limits should still be sized for concurrent Function instances.
-- A cold connection or Atlas firewall issue is surfaced as a sanitized API error; check Atlas access-list, URI, database user, TLS, and region settings.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `MODEL_API_KEY` | Yes | Meta Model API key; server-only. |
+| `META_BASE_URL` | No | Defaults to `https://api.meta.ai/v1`. |
+| `MONGODB_URI` | Yes | Authenticated MongoDB Atlas URI for the production database. |
+| `IMAGE_STORAGE_PROVIDER` | Yes | Must be `cloudinary` in production. |
+| `CLOUDINARY_CLOUD_NAME` | Yes | Production Cloudinary account. |
+| `CLOUDINARY_API_KEY` | Yes | Server-only Cloudinary credential. |
+| `CLOUDINARY_API_SECRET` | Yes | Server-only Cloudinary secret. |
+| `CLIENT_URL` | Yes | Exact frontend origin, `https://krishilens-nine.vercel.app`. No path or wildcard. |
+| `PORT` | Render-provided | The service reads Render's injected port. |
 
-## 4. Private image storage
+Use an Atlas database user with only the permissions the service needs, TLS, and an appropriate network access policy. The Mongoose connection uses a 10-second server-selection timeout and a maximum pool size of 10 per process; account for the number of Render instances when sizing Atlas limits. Do not use the production URI in integration tests.
 
-Production must set `IMAGE_STORAGE_PROVIDER=cloudinary` and all three Cloudinary credentials. Uploads use the existing authenticated Cloudinary delivery type; downloads still pass through the case-authorized API, which checks bearer-token ownership and scan membership before retrieving the asset. Do not change assets to `public`, return Cloudinary URLs as authorization, or expose the Cloudinary secret.
+Cloudinary uploads must remain `authenticated`. Case image downloads go through the owner-authorized API. Do not expose signed delivery URLs, make assets public, or return credentials to the browser.
 
-Local file storage remains available for development and existing development scans; it is not persistent Vercel storage. Vercel Functions can be restarted or run on another instance, so filesystem data must not be used for production image or case persistence. Existing development files are not migrated or removed.
+## 3. Disposable real-service integration test
 
-## 5. Function and image limits
+`npm run test:e2e --prefix server` runs a real integration against a local child API process and **dedicated external test services**. It does not mock SAM, Muse, MongoDB, or Cloudinary, and does not call or mutate the deployed production API. It creates a new database named `krishilens_e2e_<run-uuid>` for each run, creates a random owner and case, and saves cleanup metadata without access tokens or credentials.
 
-Vercel Function request and response bodies are limited to 4.5 MB. Both image-upload routes therefore cap the source image at 4 MiB (multipart headers and fields add request overhead). The SAM endpoint also limits its serialized response to 4 MiB; if an unusually large result exceeds that threshold, it omits the optional overlay and object list from the response while preserving measurements, access tokens, and the saved scan.
+The test uses two Wikimedia Commons rice images:
 
-The Express Function is configured for 300 seconds, the maximum available on Hobby plans; higher plans may allow longer durations subject to current Vercel limits and project settings. Muse Spark agent execution is bounded at 240 seconds. A SAM analysis may make up to three sequential model calls with a 90-second per-call timeout, so a worst-case run can approach the 300-second Function ceiling. The browser request timeout is 290 seconds. Provider latency can still exceed these bounds; a timeout is reported as a failed request, not a successful analysis.
+- [RiceSheathArk.jpg](https://commons.wikimedia.org/wiki/File:RiceSheathArk.jpg) — public domain; photo by Peggy Greb, USDA Agricultural Research Service; credit: USDA ARS, image D1769-1.
+- [Leafs of rice plant.jpg](https://commons.wikimedia.org/wiki/File:Leafs_of_rice_plant.jpg) — CC BY-SA 4.0; photographer/uploader Sivabalachandar03. Attribution and license are retained here; the test downloads the original temporarily and does not add either image to the repository.
 
-There is a specific worst-case re-check limitation: after its SAM calls, a comparable re-check may also call Muse Spark to explain the comparison. Three 90-second SAM timeouts plus up to 60 seconds for the retried Muse request can exceed the 300-second Hobby Function limit, before database or Cloudinary work. The current timeouts are intentionally unchanged to avoid shortening existing behavior. Do not treat this configuration as a guarantee for that worst case. The smallest runtime-side remedy is to reduce the SAM per-call timeout/budget for re-checks or move the optional comparison explanation out of the synchronous request; alternatively, use a plan/configuration that supports a longer function and raise the client timeout accordingly.
+These are different example photos, not a controlled before/after pair. The test deliberately marks angle, lighting, and plant region as unconfirmed and requires an **inconclusive** comparison. It must not be interpreted as a disease or treatment efficacy evaluation. The image bytes are transmitted to Meta and the dedicated Cloudinary account during the run.
 
-Vercel's standard uncompressed Function bundle limit is 250 MB. The default Hobby memory allocation is 2 GB; higher plans/settings may allow more. Keep dependencies and build output within the selected plan's current limits. Image buffers and segmentation processing are in-memory and bounded by the upload/dimension limits; binary images and masks are not returned as ordinary agent API data.
+### One-time test setup
 
-## 6. CORS and previews
+1. Create a disposable Atlas cluster/database user and a separate Cloudinary product environment/account. Never point either at production. Use test-only Meta credentials if available; real inference can incur provider charges.
+2. From `server/`, create an ignored `.env.e2e` file. The required names are below; values are intentionally not provided in this document:
 
-`CLIENT_URL` must be the exact deployed frontend origin, including `https://` and excluding a path. Configure a separate matching value for each Preview environment or use a stable custom preview domain. The backend intentionally does not allow wildcard origins. The frontend must use the backend's HTTPS origin in `VITE_API_URL`.
+   ```text
+   E2E_MONGODB_URI
+   E2E_MONGODB_HOST
+   E2E_MODEL_API_KEY
+   E2E_CLOUDINARY_CLOUD_NAME
+   E2E_CLOUDINARY_API_KEY
+   E2E_CLOUDINARY_API_SECRET
+   E2E_DATABASE_CONFIRMATION=I_HAVE_CONFIGURED_A_DISPOSABLE_ATLAS_CLUSTER
+   E2E_CLOUDINARY_CONFIRMATION=I_HAVE_CONFIGURED_A_DISPOSABLE_CLOUDINARY_ACCOUNT
+   # Optional:
+   E2E_META_BASE_URL=https://api.meta.ai/v1
+   ```
 
-## 7. Build and smoke-test checklist
+   `E2E_MONGODB_HOST` must exactly match the hostname in `E2E_MONGODB_URI`. The runner replaces only the database name with its fresh run-specific E2E name. It never falls back to `MONGODB_URI`, `MODEL_API_KEY`, or production Cloudinary variables. Confirm the Atlas user can create and drop only disposable databases and the Cloudinary credentials belong to the dedicated test account.
+3. Keep `.env.e2e` private. Do not print or paste it into logs, CI output, or support requests.
 
-Before deploying, run from the repository root:
+### Run and cleanup
 
 ```sh
-VITE_API_URL=https://api.example.invalid npm run typecheck
-npm run test
-npm run lint --prefix client
-VITE_API_URL=https://api.example.invalid npm run build
+npm run test:e2e --prefix server
 ```
 
-The HTTPS origin above is a non-routable placeholder for local build verification; use the actual backend origin in Vercel. Production Vite builds fail clearly if `VITE_API_URL` is missing or is not an HTTPS origin.
+The workflow creates a dedicated owner, creates a case through the API, uploads a licensed image to real SAM and authenticated Cloudinary storage, runs an English Muse investigation, answers the live follow-up, generates a report, translates it to Bangla, uploads the second image for a real re-check, verifies private-image authorization and cautious comparison, then restarts the API process and confirms Mongo-backed history/report persistence.
 
-After deploying both projects:
+Cleanup runs in `finally`: it lists Cloudinary resources only beneath the random run owner's exact `krishilens/<owner-id>/` prefix, rejects resources outside that owner/UUID path or non-authenticated delivery, deletes those assets, verifies the prefix is empty, and only then drops that run's strictly validated `krishilens_e2e_<run-uuid>` database. The test does not use a public deletion endpoint and cannot target production collection names through its cleanup manifest.
 
-1. Confirm the frontend root route and refresh a nested React Router route.
-2. Confirm `GET https://<backend-origin>/api/health` returns the API health response.
-3. Confirm browser requests use the configured backend origin and pass CORS preflight.
-4. Create an authorized crop case, upload a valid image under 4 MiB, and verify SAM analysis.
-5. Upload an invalid or oversized image and verify it is rejected with a localized UI error.
-6. Verify case history survives a page refresh and serverless cold/warm invocations.
-7. Verify an authorized case owner can retrieve a saved scan image; missing/invalid bearer tokens and another case's scan are denied.
-8. Verify Cloudinary records the image as `authenticated`; confirm public/unauthenticated delivery is denied and the API does not return a Cloudinary delivery URL.
-9. Verify agent reports retain uncertainty, citations, and null/unavailable measurements where evidence is missing; do not infer treatment success from image comparisons.
-10. Check Vercel Function logs for sanitized initialization/provider errors only, and confirm no API keys or image bytes are logged.
+If cleanup is incomplete, the run manifest remains in the ignored `server/.e2e-runs/` directory and the test fails. Retry only the named run:
 
-## Troubleshooting
+```sh
+npm run test:e2e:cleanup --prefix server -- .e2e-runs/<run-uuid>.json
+```
 
-- **Function reports missing production configuration:** set every required backend variable in the correct Vercel environment and redeploy.
-- **Frontend build rejects API configuration:** set `VITE_API_URL` to the backend's HTTPS origin without a path, then rebuild.
-- **MongoDB connection fails:** validate `MONGODB_URI`, Atlas database credentials, TLS, region, and the Vercel egress allowlist; do not disable authentication or allow all IPs.
-- **Browser CORS error:** make `CLIENT_URL` exactly match the browser's frontend origin and set `VITE_API_URL` to the backend origin; redeploy both projects after changing values.
-- **Image upload gets HTTP 413:** keep the original file at or below 4 MiB. Multipart envelope/metadata consumes additional request space.
-- **Analysis reaches a timeout:** SAM and Muse requests have bounded duration, and Vercel applies the configured maximum. Retry only after checking Function duration and provider latency; do not raise limits beyond the selected plan.
-- **Slow re-check exceeds 300 seconds:** the synchronous SAM-plus-Muse path can exceed the Hobby limit in the worst case; shorten its time budget or make comparison explanation asynchronous before relying on that latency bound.
-- **Image download fails:** confirm the case-owner bearer token, scan membership, Cloudinary authenticated delivery type, and server-side credentials. Do not make the asset public as a workaround.
-- **System prompt cannot be read:** confirm the backend project uses the checked-in `server/vercel.json` and that the deployment includes `src/agent/systemPrompt.md`.
+The cleanup command requires the same explicit disposable-environment confirmations, validates the manifest/database/owner identifiers, refuses broad Cloudinary deletion, and prints counts only. Do not hand-edit a manifest to target another database or owner. Investigate any incomplete cleanup before running another test against that test account.
 
-This repository configuration and local build checks do not prove a production deployment works. Complete the smoke tests against the actual deployed frontend, backend, MongoDB Atlas, Cloudinary, and Meta API before announcing production readiness.
+This integration test verifies application code and real external dependencies under a local Node process. It does **not** verify the deployed Render plan, ingress timeout, deployment configuration, or browser UI. For those, use a separately provisioned Render staging service and browser smoke tests; never repoint production services or credentials for cleanup.
 
-## Official references
+## 4. Production and staging verification
 
-- [Vercel Vite framework](https://vercel.com/docs/frameworks/frontend/vite)
-- [Vercel Express framework](https://vercel.com/docs/frameworks/backend/express)
-- [Vercel Function limitations](https://vercel.com/docs/functions/limitations)
+Before calling a release ready:
+
+1. Verify the Vercel frontend's `VITE_API_URL` is the deployed Render origin and the bundle contains no backend credentials.
+2. Verify Render's deployed Node version, root/build/start commands, port, health-check path, compute plan/RAM, recent deploy, and runtime logs in the Dashboard.
+3. Confirm `/api/health` and exact-origin CORS from the deployed frontend.
+4. Use only a separate staging Render service configured with disposable Atlas and Cloudinary resources for image-based workflow tests.
+5. Confirm an unauthorized request cannot read a case or image; confirm authorized retrieval works and unauthenticated Cloudinary delivery fails.
+6. Confirm the English and Bangla flows, SAM upload, agent follow-up/report, case history after process restart, and second-scan comparison.
+7. Check for null/unavailable measurement handling and explicit uncertainty; do not infer diagnosis, recovery, or treatment success from segmentation/comparisons.
+8. Verify the run's Cloudinary prefix is empty and its unique E2E database is dropped before declaring cleanup complete.
+9. Inspect startup/runtime logs for sanitized errors only; never export API keys, tokens, connection strings, or image content.
+
+`GET /api/health` confirms API responsiveness only. A passing local test is not a production or Render staging pass.
+
+## 5. Build and test commands
+
+Run from the repository root:
+
+```sh
+VITE_API_URL=https://krishilens-api.onrender.com npm run typecheck
+npm test
+npm run lint --prefix client
+VITE_API_URL=https://krishilens-api.onrender.com npm run build
+```
+
+The `VITE_API_URL` value is public configuration, not a secret. The real-service E2E test is opt-in and is not part of the ordinary test suite.
+
+## Known limitations
+
+- There is no checked-in Render Blueprint; dashboard settings are authoritative until a Render manifest is intentionally added.
+- The client allows a long request timeout, but that cannot extend Render's request/ingress limit. SAM/Muse work is synchronous and re-check requests may exceed that limit. Confirm the current Render cutoff for the deployed service and treat gateway timeouts as uncertain completion; inspect case history before retries.
+- Local files are not durable storage on Render. Production cases/images must use MongoDB Atlas and authenticated Cloudinary.
+- A cold start, Atlas selection timeout, provider latency, or Render restart can interrupt long synchronous workflows. Boundaries return errors; they do not prove that no downstream side effect occurred.
+- A successful real-service E2E run does not replace checking the current deployed Render version/compute plan or testing the actual production UI.

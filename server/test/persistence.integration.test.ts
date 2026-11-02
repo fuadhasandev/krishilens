@@ -27,6 +27,7 @@ import {
   ScanModel,
   TraceModel,
 } from '../src/models/index.js'
+import { assertDisposableIntegrationDatabase } from './helpers/integrationSafety.js'
 import {
   privateImageStorage,
   type PrivateImageReference,
@@ -92,6 +93,7 @@ async function stopApiProcess(child: ChildProcess): Promise<void> {
 test('MongoDB persists case, scan image, re-check, and awaiting agent state across process restarts', {
   skip: !enabled,
 }, async () => {
+  assertDisposableIntegrationDatabase()
   await connectDatabase()
   useMongoScanStore()
   useMongoSessionStore()

@@ -22,6 +22,10 @@ import {
   type PrivateImageReference,
   type PrivateImageStorage,
 } from '../src/services/privateImageStorage.js'
+import {
+  assertDedicatedCloudinaryConfirmation,
+  assertDisposableIntegrationDatabase,
+} from './helpers/integrationSafety.js'
 
 const enabled = process.env.RUN_CLOUDINARY_INTEGRATION_TESTS === '1'
 const testPng = Buffer.from(
@@ -33,6 +37,8 @@ test('Cloudinary authenticated image remains private through the authorized case
   skip: !enabled,
 }, async () => {
   let stage = 'validating configuration and connecting to MongoDB'
+  assertDisposableIntegrationDatabase()
+  assertDedicatedCloudinaryConfirmation()
   assert.equal(env.imageStorageProvider, 'cloudinary')
   assert.ok(env.cloudinary.cloudName && env.cloudinary.apiKey && env.cloudinary.apiSecret)
   await connectDatabase()

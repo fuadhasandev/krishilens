@@ -17,7 +17,7 @@ The project includes a text-only Muse Spark preview, SAM 3.1 image segmentation,
 
 Requirements: Node.js 22.x and npm.
 
-For two-project Vercel deployment instructions, see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+For Vercel frontend and Render API deployment guidance, see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
 
 1. Install dependencies from the repository root:
 
@@ -77,7 +77,14 @@ Run these from the repository root:
 
 Production build and typecheck commands require `VITE_API_URL` to be set to the HTTPS backend origin. See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for a local verification command.
 
-To run the optional real Cloudinary integration test, set `IMAGE_STORAGE_PROVIDER=cloudinary` and `RUN_CLOUDINARY_INTEGRATION_TESTS=1` in the server process environment, then run `npm run test:cloudinary` from `server/`. The test requires the Cloudinary credentials and MongoDB connection, and deletes its temporary image and records.
+The real-service end-to-end workflow uses a unique disposable Atlas database and a dedicated Cloudinary account. Configure the `E2E_*` values in the ignored `server/.env.e2e` file, then run `npm run test:e2e --prefix server`. It invokes real SAM and Muse requests and removes the current run's Cloudinary assets and database; setup, licensed image attribution, and recovery from incomplete cleanup are documented in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). Do not point integration tests at production services.
+
+The narrower optional Cloudinary integration test can be run with `RUN_CLOUDINARY_INTEGRATION_TESTS=1 npm run test:cloudinary --prefix server`. It requires `IMAGE_STORAGE_PROVIDER=cloudinary`, a `MONGODB_URI` database named `krishilens_integration_test` (or a generated `krishilens_e2e_*` name), and the explicit `E2E_CLOUDINARY_CONFIRMATION` value documented in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). Live integration tests refuse unrecognized database names.
+
+Additional commands:
+
+| Command | Purpose |
+| --- | --- |
 | `npm test` | Run backend agent, upload, parser, mask-math, and provider error tests |
 | `npm run test --prefix client` | Run bilingual UI, locale parity, persistence, and request-language tests |
 | `npm run lint --prefix client` | Lint the frontend |
