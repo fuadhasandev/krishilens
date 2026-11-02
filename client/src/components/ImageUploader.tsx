@@ -1,4 +1,5 @@
 import { ImagePlus, RefreshCw, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { isSupportedImageUpload } from '../utils/imageUpload'
 
@@ -16,6 +17,7 @@ export function ImageUploader({
   onImageChange,
 }: ImageUploaderProps) {
   const { t } = useTranslation()
+  const [dragging, setDragging] = useState(false)
 
   function selectImage(file: File | undefined) {
     if (!file) {
@@ -29,9 +31,27 @@ export function ImageUploader({
   }
 
   return (
-    <div>
+    <div
+      className={`rounded-2xl border border-dashed p-4 transition-colors sm:p-5 ${dragging ? 'border-[#2F855A] bg-[#EAF4E8]' : 'border-[#cbd8c4] bg-[#fbfcf9]'}`}
+      onDragEnter={(event) => {
+        event.preventDefault()
+        setDragging(true)
+      }}
+      onDragLeave={(event) => {
+        const nextTarget = event.relatedTarget
+        if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+          setDragging(false)
+        }
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault()
+        setDragging(false)
+        selectImage(event.dataTransfer.files[0])
+      }}
+    >
       <div className="flex flex-wrap gap-3">
-        <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#dce6d6] bg-white px-4 py-2.5 text-sm font-semibold text-[#315d3d] transition-colors hover:bg-[#f7f8f2]">
+        <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#d6e2d3] bg-white px-4 py-2.5 text-sm font-semibold text-[#174D35] transition-colors hover:bg-[#f1f5ed] focus-within:ring-2 focus-within:ring-[#2F855A]">
           <ImagePlus aria-hidden="true" size={18} />
           {image ? t('imageAnalysis.chooseAnother') : t('imageAnalysis.chooseImage')}
           <input
@@ -47,7 +67,7 @@ export function ImageUploader({
             type="file"
           />
         </label>
-        <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#dce6d6] bg-white px-4 py-2.5 text-sm font-semibold text-[#315d3d] transition-colors hover:bg-[#f7f8f2]">
+        <label className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[#d6e2d3] bg-white px-4 py-2.5 text-sm font-semibold text-[#174D35] transition-colors hover:bg-[#f1f5ed] focus-within:ring-2 focus-within:ring-[#2F855A]">
           <RefreshCw aria-hidden="true" size={17} />
           {t('imageAnalysis.takePhoto')}
           <input
@@ -69,9 +89,12 @@ export function ImageUploader({
       <p className="mt-2 text-xs leading-5 text-[#7b887e]">
         {t('imageAnalysis.fileRules')}
       </p>
+      <p className="mt-1 text-xs font-medium text-[#2F855A]">
+        {t(dragging ? 'imageAnalysis.dropImage' : 'imageAnalysis.dragImage')}
+      </p>
 
       {previewUrl && image && (
-        <div className="relative mt-5 overflow-hidden rounded-2xl border border-[#e5ebdf] bg-[#f7f8f2]">
+        <div className="relative mt-5 overflow-hidden rounded-2xl border border-[#e2e9de] bg-[#f7f8f2]">
           <img
             alt={t('imageAnalysis.preview', { name: image.name })}
             className="mx-auto max-h-[28rem] w-full object-contain"

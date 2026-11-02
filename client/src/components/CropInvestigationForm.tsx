@@ -3,6 +3,7 @@ import { LoaderCircle, Send } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { analyzeCrop } from '../services/cropAnalysis'
 import { currentLanguage } from '../i18n'
+import { Alert, Button, Select, Textarea } from './ui'
 import type {
   Crop,
   CropAnalysisResponse,
@@ -44,7 +45,7 @@ export function CropInvestigationForm() {
   return (
     <section
       aria-labelledby="investigation-title"
-      className="mx-auto w-full max-w-3xl rounded-3xl border border-[#e5ebdf] bg-white p-5 shadow-sm sm:p-8"
+      className="mx-auto w-full max-w-3xl rounded-3xl border border-[#e2e9de] bg-white p-5 shadow-[0_12px_36px_rgba(23,77,53,0.06)] sm:p-8"
       id="investigate"
     >
       <div className="mb-6">
@@ -63,8 +64,7 @@ export function CropInvestigationForm() {
       <form className="space-y-5" onSubmit={handleSubmit}>
         <label className="block text-sm font-medium text-[#31513b]">
           {t('common.crop')}
-          <select
-            className="mt-2 min-h-12 w-full rounded-xl border border-[#dce6d6] bg-[#fbfcf9] px-3 text-base text-[#183b2c] outline-none focus:border-[#4c8456] focus:ring-2 focus:ring-[#4c8456]/20"
+          <Select
             onChange={(event) => setCrop(event.target.value as Crop)}
             value={crop}
           >
@@ -73,14 +73,13 @@ export function CropInvestigationForm() {
                 {t(`common.${value}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         <label className="block text-sm font-medium text-[#31513b]">
           {t('home.observations')}
-          <textarea
+          <Textarea
             autoComplete="off"
-            className="mt-2 min-h-32 w-full resize-y rounded-xl border border-[#dce6d6] bg-[#fbfcf9] px-3 py-3 text-base leading-6 text-[#183b2c] outline-none placeholder:text-[#89968b] focus:border-[#4c8456] focus:ring-2 focus:ring-[#4c8456]/20"
             maxLength={2000}
             onChange={(event) => {
               setQuestion(event.target.value)
@@ -97,8 +96,8 @@ export function CropInvestigationForm() {
           </span>
         </label>
 
-        <button
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1f603f] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#194d33] focus:outline-none focus:ring-2 focus:ring-[#4c8456] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-65 sm:w-auto sm:text-base"
+        <Button
+          className="w-full sm:w-auto sm:text-base"
           disabled={isLoading || question.trim().length < 3}
           type="submit"
         >
@@ -113,21 +112,17 @@ export function CropInvestigationForm() {
               <Send aria-hidden="true" size={17} />
             </>
           )}
-        </button>
+        </Button>
       </form>
 
       {error && (
-        <div
-          aria-live="polite"
-          className="mt-6 rounded-xl border border-[#f1d4cd] bg-[#fff7f4] p-4 text-sm leading-6 text-[#854735]"
-          role="alert"
-        >
+        <Alert aria-live="polite" className="mt-6" role="alert">
           <span id="crop-question-error">
             {error.startsWith('validation.')
               ? t(error, { defaultValue: t('validation.questionMin') })
               : t(`errors.${error}`, { defaultValue: t('errors.ANALYSIS_FAILED') })}
           </span>
-        </div>
+        </Alert>
       )}
 
       {result?.success && (

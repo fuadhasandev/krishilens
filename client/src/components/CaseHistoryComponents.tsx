@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { loadScanImage, scheduleRecheck, submitRecheck } from '../services/cases'
+import { Alert, Badge, Button, Card, Input, Select, Textarea } from './ui'
 import { formatCaseDate } from '../utils/caseHistory'
 import { isSupportedImageUpload } from '../utils/imageUpload'
 import type { CaseRecheck, CaseScan, CropCase } from '../types/cases'
@@ -11,7 +12,7 @@ export function CaseCard({ cropCase }: { cropCase: CropCase }) {
   const dueDate = cropCase.nextRecheckAt
   const overdue = cropCase.isRecheckOverdue ?? false
   return (
-    <article className="rounded-2xl border border-[#e5ebdf] bg-white p-5 shadow-sm">
+    <Card as="article" className="p-5 transition-shadow hover:shadow-[0_12px_30px_rgba(23,77,53,0.08)] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[#183b2c]">
@@ -22,21 +23,21 @@ export function CaseCard({ cropCase }: { cropCase: CropCase }) {
           </p>
         </div>
         {dueDate && (
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${overdue ? 'bg-[#fff0e8] text-[#854735]' : 'bg-[#e9f1e4] text-[#326548]'}`}>
+          <Badge tone={overdue ? 'amber' : 'green'}>
             {t(overdue ? 'caseHistory.overdue' : 'caseHistory.upcoming')}: {formatCaseDate(dueDate, i18n.language)}
-          </span>
+          </Badge>
         )}
       </div>
       <p className="mt-3 text-sm text-[#617166]">
         {t('caseHistory.caseStatus')}: {t(`caseHistory.${cropCase.status === 'needs_follow_up' ? 'needsFollowUp' : cropCase.status}`)}
       </p>
       <Link
-        className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-[#1f603f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#194d33] focus:outline-none focus:ring-2 focus:ring-[#4c8456]"
+        className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-[#174D35] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#103d29] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2F855A] focus-visible:ring-offset-2"
         to={`/cases/${cropCase.caseId}`}
       >
         {t('caseHistory.open')}
       </Link>
-    </article>
+    </Card>
   )
 }
 
@@ -93,10 +94,10 @@ export function ScanHistory({ caseId, scans }: { caseId: string; scans: CaseScan
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {scans.map((scan) => (
-        <article className="rounded-2xl border border-[#e5ebdf] p-4" key={scan.scanId}>
+        <Card as="article" className="p-4" key={scan.scanId}>
           <ScanImage caseId={caseId} scan={scan} />
           <ScanSummary scan={scan} />
-        </article>
+        </Card>
       ))}
     </div>
   )
@@ -119,7 +120,7 @@ export function ScanComparison({
     ? '—'
     : `${new Intl.NumberFormat(i18n.language === 'bn' ? 'bn-BD' : 'en', { maximumFractionDigits: 1 }).format(value)}%`
   return (
-    <section className="space-y-3 rounded-xl border border-[#e5ebdf] bg-[#fbfcf9] p-4">
+    <section className="space-y-3 rounded-2xl border border-[#e2e9de] bg-[#fbfcf9] p-4 sm:p-5">
       <h3 className="font-semibold">{t('caseHistory.comparison')}</h3>
       <p className="font-medium text-[#315d3d]">
         {t(`caseHistory.${comparison?.assessment === 'possible_improvement' ? 'possibleImprovement' : comparison?.assessment === 'possible_worsening' ? 'possibleWorsening' : 'inconclusive'}`)}
@@ -143,7 +144,7 @@ export function ScanComparison({
 export function ProgressAssessment({ recheck }: { recheck: CaseRecheck }) {
   const { t, i18n } = useTranslation()
   return (
-    <aside className="rounded-xl border border-[#dce6d6] bg-[#f1f5ed] p-4">
+    <aside className="rounded-2xl border border-[#d6e2d3] bg-[#EAF4E8] p-4 sm:p-5">
       <h3 className="font-semibold">{t('caseHistory.progressAssessment')}</h3>
       <p className="mt-2 text-sm leading-6">{recheck.assessment.text}</p>
       {recheck.comparison === null ? (
@@ -219,7 +220,7 @@ export function RecheckReminder({
   }
 
   return (
-    <section className="space-y-3 rounded-2xl border border-[#e5ebdf] bg-white p-5">
+    <Card as="section" className="space-y-3 p-4 sm:p-5">
       <h2 className="text-lg font-semibold">{t('caseHistory.schedule')}</h2>
       {dueDate ? (
         <p className={`text-sm font-medium ${overdue ? 'text-[#854735]' : 'text-[#326548]'}`}>
@@ -229,14 +230,14 @@ export function RecheckReminder({
       <div className="flex flex-wrap gap-2">
         <label className="flex min-h-11 flex-1 flex-col gap-1 text-sm font-medium">
           <span>{t('caseHistory.scheduleDate')}</span>
-          <input className="min-h-11 rounded-lg border border-[#dce6d6] bg-[#fbfcf9] px-3" onChange={(event) => setDate(event.target.value)} type="datetime-local" value={date} />
+          <Input className="min-h-11" onChange={(event) => setDate(event.target.value)} type="datetime-local" value={date} />
         </label>
-        <button className="mt-auto min-h-11 rounded-lg bg-[#1f603f] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" disabled={!date || busy} onClick={() => void save(date)} type="button">{busy ? t('caseHistory.saving') : t('caseHistory.saveDate')}</button>
-        {dueDate && <button className="mt-auto min-h-11 rounded-lg border border-[#dce6d6] px-4 py-2 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={() => void save(null)} type="button">{t('caseHistory.clearDate')}</button>}
+        <Button className="mt-auto min-h-11 py-2" disabled={!date || busy} onClick={() => void save(date)} type="button">{busy ? t('caseHistory.saving') : t('caseHistory.saveDate')}</Button>
+        {dueDate && <Button className="mt-auto min-h-11 py-2" disabled={busy} onClick={() => void save(null)} type="button" variant="secondary">{t('caseHistory.clearDate')}</Button>}
       </div>
       {saved && <p aria-live="polite" className="text-sm text-[#326548]" role="status">{t('caseHistory.dateSaved')}</p>}
-      {error && <p aria-live="polite" className="text-sm text-[#854735]" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.REQUEST_FAILED') })}</p>}
-    </section>
+      {error && <Alert aria-live="polite" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.REQUEST_FAILED') })}</Alert>}
+    </Card>
   )
 }
 
@@ -295,7 +296,8 @@ export function RecheckForm({
   }
 
   return (
-    <form className="space-y-4 rounded-2xl border border-[#e5ebdf] bg-white p-5" onSubmit={(event) => void submit(event)}>
+    <Card as="section" className="p-4 sm:p-6">
+    <form className="space-y-5" onSubmit={(event) => void submit(event)}>
       <div>
         <h2 className="text-lg font-semibold">{t('caseHistory.uploadTitle')}</h2>
         <p className="mt-1 text-sm leading-6 text-[#617166]">{t('caseHistory.uploadInstructions')}</p>
@@ -304,7 +306,8 @@ export function RecheckForm({
         {t('caseHistory.chooseImage')}
         <input
           accept="image/jpeg,image/png,image/webp"
-          className="mt-2 block w-full text-sm"
+          capture="environment"
+          className="mt-2 block min-h-12 w-full cursor-pointer rounded-xl border border-[#d6e2d3] bg-[#fbfcf9] text-sm file:mr-3 file:min-h-12 file:cursor-pointer file:border-0 file:bg-[#EAF4E8] file:px-4 file:font-semibold file:text-[#174D35] focus-visible:ring-2 focus-visible:ring-[#2F855A]"
           onChange={(event) => {
             const file = event.target.files?.[0]
             if (!file) {
@@ -324,16 +327,17 @@ export function RecheckForm({
           type="file"
         />
       </label>
+      {image && <p className="truncate rounded-lg bg-[#EAF4E8] px-3 py-2 text-sm text-[#174D35]">{image.name}</p>}
       <label className="block text-sm font-medium">
         {t('caseHistory.observations')}
-        <textarea className="mt-2 min-h-24 w-full rounded-xl border border-[#dce6d6] bg-[#fbfcf9] p-3 text-base" maxLength={2000} onChange={(event) => setObservations(event.target.value)} placeholder={t('caseHistory.observationsPlaceholder')} value={observations} />
+        <Textarea maxLength={2000} onChange={(event) => setObservations(event.target.value)} placeholder={t('caseHistory.observationsPlaceholder')} value={observations} />
       </label>
       {scans.length > 0 && (
         <label className="block text-sm font-medium">
           {t('caseHistory.previousScan')}
-          <select className="mt-2 min-h-11 w-full rounded-lg border border-[#dce6d6] bg-[#fbfcf9] px-3" onChange={(event) => setPreviousScanId(event.target.value)} value={previousScanId}>
+          <Select className="min-h-11" onChange={(event) => setPreviousScanId(event.target.value)} value={previousScanId}>
             {scans.map((scan) => <option key={scan.scanId} value={scan.scanId}>{formatCaseDate(scan.createdAt, i18n.language)} · {scan.scanId.slice(0, 8)}</option>)}
-          </select>
+          </Select>
         </label>
       )}
       <fieldset className="space-y-2 rounded-xl bg-[#f7f8f2] p-4">
@@ -345,8 +349,9 @@ export function RecheckForm({
           </label>
         ))}
       </fieldset>
-      {error && <p aria-live="polite" className="rounded-lg bg-[#fff7f4] p-3 text-sm text-[#854735]" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.REQUEST_FAILED') })}</p>}
-      <button className="min-h-12 w-full rounded-xl bg-[#1f603f] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto" disabled={!image || busy} type="submit">{busy ? t('caseHistory.submitting') : t('caseHistory.submitRecheck')}</button>
+      {error && <Alert aria-live="polite" role="alert">{t(`errors.${error}`, { defaultValue: t('errors.REQUEST_FAILED') })}</Alert>}
+      <Button className="w-full sm:w-auto" disabled={!image || busy} type="submit">{busy ? t('caseHistory.submitting') : t('caseHistory.submitRecheck')}</Button>
     </form>
+    </Card>
   )
 }

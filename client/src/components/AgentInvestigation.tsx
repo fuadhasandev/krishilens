@@ -31,6 +31,7 @@ export function AgentInvestigation({
 }: AgentInvestigationProps) {
   const { t } = useTranslation()
   const [session, setSession] = useState<AgentSessionResponse | null>(null)
+  const [farmerMessages, setFarmerMessages] = useState<string[]>([])
   const [accessToken, setAccessToken] = useState('')
   const [translation, setTranslation] =
     useState<TranslatedInvestigationText | null>(null)
@@ -64,6 +65,7 @@ export function AgentInvestigation({
         question: farmerQuestion,
       })
       setSession(result)
+      setFarmerMessages([farmerQuestion])
       setAccessToken(result.accessToken ?? '')
       setTranslation(null)
       return true
@@ -90,6 +92,7 @@ export function AgentInvestigation({
           session.language,
         ),
       )
+      setFarmerMessages((messages) => [...messages, answer])
       setTranslation(null)
       return true
     } catch (requestError) {
@@ -183,6 +186,15 @@ export function AgentInvestigation({
               {t(otherLanguage)}
             </span>
           </div>
+
+          <ol aria-label={t('investigation.farmerMessages')} className="space-y-3">
+            {farmerMessages.map((message, index) => (
+              <li className="ml-auto max-w-[92%] rounded-2xl rounded-br-md bg-[#174D35] p-4 text-sm leading-6 text-white sm:max-w-[80%]" key={`${index}-${message}`}>
+                <p className="mb-1 text-xs font-semibold text-white/75">{t('investigation.farmerLabel')}</p>
+                <p className="whitespace-pre-wrap">{message}</p>
+              </li>
+            ))}
+          </ol>
 
           {displayLanguage !== sessionLanguage &&
             (session.report || session.pendingQuestion) && (

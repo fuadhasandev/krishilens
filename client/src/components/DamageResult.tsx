@@ -1,5 +1,6 @@
 import type { ImageAnalysisResponse } from '../types/imageAnalysis'
 import { useTranslation } from 'react-i18next'
+import { Badge } from './ui'
 
 interface DamageResultProps {
   result: ImageAnalysisResponse
@@ -44,11 +45,13 @@ export function DamageResult({ result }: DamageResultProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-[#e5ebdf] bg-[#f7f8f2] p-4">
           <p className="text-sm text-[#617166]">{t('imageAnalysis.leafSegmentation')}</p>
-          <p className="mt-1 font-semibold text-[#183b2c]">
-            {result.leaf.detected
-              ? t('imageAnalysis.leafDetected')
-              : t('imageAnalysis.leafNotDetected')}
-          </p>
+          <div className="mt-2">
+            <Badge tone={result.leaf.detected ? 'green' : 'neutral'}>
+              {result.leaf.detected
+                ? t('imageAnalysis.leafDetected')
+                : t('imageAnalysis.leafNotDetected')}
+            </Badge>
+          </div>
           {result.leaf.pixelCount !== null && (
             <p className="mt-1 text-sm text-[#617166]">
               {t('imageAnalysis.maskPixels', { count: number.format(result.leaf.pixelCount) })}
@@ -57,9 +60,11 @@ export function DamageResult({ result }: DamageResultProps) {
         </div>
         <div className="rounded-2xl border border-[#e5ebdf] bg-[#f7f8f2] p-4">
           <p className="text-sm text-[#617166]">{t('imageAnalysis.selectedRegion')}</p>
-          <p className="mt-1 font-semibold text-[#183b2c]">
-            {t(`imageAnalysis.${statusKeys[result.affectedArea.status]}`)}
-          </p>
+          <div className="mt-2">
+            <Badge tone={result.affectedArea.status === 'accepted' ? 'green' : result.affectedArea.status === 'needs_review' ? 'amber' : 'neutral'}>
+              {t(`imageAnalysis.${statusKeys[result.affectedArea.status]}`)}
+            </Badge>
+          </div>
           {result.affectedArea.percentage !== null ? (
             <>
               <p className="mt-1 text-2xl font-semibold text-[#326548]">

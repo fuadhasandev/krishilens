@@ -53,7 +53,7 @@ describe('KrishiLens bilingual interface', () => {
         <App />
       </MemoryRouter>,
     )
-    expect(screen.getByText('ফসলের সমস্যা খতিয়ে দেখতে আপনার এআই সহকারী।')).toBeInTheDocument()
+    expect(screen.getByText('এআই-চালিত ছবির বিশ্লেষণ, পরবর্তী প্রশ্ন এবং নিয়মিত পর্যবেক্ষণের মাধ্যমে ফসলের সমস্যা খতিয়ে দেখুন।')).toBeInTheDocument()
     const question = screen.getByRole('textbox', { name: /আপনি কী লক্ষ করেছেন/ })
     await user.type(question, 'পাতায় দাগ')
     await user.selectOptions(
@@ -61,7 +61,8 @@ describe('KrishiLens bilingual interface', () => {
       'en',
     )
 
-    expect(await screen.findByText('Your AI-powered crop investigation assistant.')).toBeInTheDocument()
+    expect(await screen.findByText('Investigate crop problems with AI-powered visual analysis, follow-up questions, and ongoing monitoring.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Smarter Crop Care Starts Here.' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: /What have you observed/ })).toHaveValue('পাতায় দাগ')
     await waitFor(() => expect(document.documentElement.lang).toBe('en'))
     expect(localStorage.getItem(languageStorageKey)).toBe('en')
