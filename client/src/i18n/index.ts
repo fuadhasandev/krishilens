@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import bn from './locales/bn.json'
 
-export const supportedLanguages = ['bn', 'en'] as const
+export const supportedLanguages = ['en', 'bn'] as const
 export type AppLanguage = (typeof supportedLanguages)[number]
 export const languageStorageKey = 'krishilens.language'
 
@@ -12,16 +12,16 @@ export function readSavedLanguage(): AppLanguage {
     const saved = window.localStorage.getItem(languageStorageKey)
     return supportedLanguages.includes(saved as AppLanguage)
       ? (saved as AppLanguage)
-      : 'bn'
+      : 'en'
   } catch {
-    return 'bn'
+    return 'en'
   }
 }
 
 void i18n.use(initReactI18next).init({
   resources: { en: { translation: en }, bn: { translation: bn } },
   lng: readSavedLanguage(),
-  fallbackLng: 'bn',
+  fallbackLng: 'en',
   supportedLngs: supportedLanguages,
   interpolation: { escapeValue: false },
   returnNull: false,
@@ -58,7 +58,7 @@ declare module 'i18next' {
 }
 
 export function currentLanguage(): AppLanguage {
-  return i18n.resolvedLanguage === 'en' ? 'en' : 'bn'
+  return i18n.resolvedLanguage === 'bn' ? 'bn' : 'en'
 }
 
 export default i18n

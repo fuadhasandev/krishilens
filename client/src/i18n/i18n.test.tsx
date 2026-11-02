@@ -31,41 +31,43 @@ function sourceFiles(directory: string): string[] {
 describe('KrishiLens bilingual interface', () => {
   beforeEach(async () => {
     localStorage.clear()
-    await i18n.changeLanguage('bn')
+    await i18n.changeLanguage('en')
   })
 
   afterEach(() => {
     localStorage.clear()
   })
 
-  it('defaults new users to Bangla and restores only supported preferences', () => {
-    expect(readSavedLanguage()).toBe('bn')
-    localStorage.setItem(languageStorageKey, 'fr')
-    expect(readSavedLanguage()).toBe('bn')
-    localStorage.setItem(languageStorageKey, 'en')
+  it('defaults new users to English and restores only supported preferences', () => {
     expect(readSavedLanguage()).toBe('en')
+    localStorage.setItem(languageStorageKey, 'fr')
+    expect(readSavedLanguage()).toBe('en')
+    localStorage.setItem(languageStorageKey, 'bn')
+    expect(readSavedLanguage()).toBe('bn')
   })
 
-  it('switches visible home text, updates document language, persists, and keeps form data', async () => {
+  it('starts in English and switches the home interface without losing form data', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter>
         <App />
       </MemoryRouter>,
     )
-    expect(screen.getByText('এআই-চালিত ছবির বিশ্লেষণ, পরবর্তী প্রশ্ন এবং নিয়মিত পর্যবেক্ষণের মাধ্যমে ফসলের সমস্যা খতিয়ে দেখুন।')).toBeInTheDocument()
-    const question = screen.getByRole('textbox', { name: /আপনি কী লক্ষ করেছেন/ })
-    await user.type(question, 'পাতায় দাগ')
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'প্রদর্শনের ভাষা বেছে নিন' }),
-      'en',
-    )
-
-    expect(await screen.findByText('Investigate crop problems with AI-powered visual analysis, follow-up questions, and ongoing monitoring.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Smarter Crop Care Starts Here.' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: /What have you observed/ })).toHaveValue('পাতায় দাগ')
-    await waitFor(() => expect(document.documentElement.lang).toBe('en'))
-    expect(localStorage.getItem(languageStorageKey)).toBe('en')
+    expect(screen.getByText('Smarter Farming Starts Here')).toBeInTheDocument()
+    expect(screen.getByText('Upload a crop photo')).toBeInTheDocument()
+    const question = screen.getByRole('textbox', { name: /What have you observed/ })
+    await user.type(question, 'Brown marks on leaves')
+    await user.click(screen.getByRole('button', { name: 'বাংলা' }))
+
+    expect(await screen.findByText('এআই-চালিত ছবির বিশ্লেষণ, পরবর্তী প্রশ্ন এবং নিয়মিত পর্যবেক্ষণের মাধ্যমে ফসলের সমস্যা খতিয়ে দেখুন।')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'ফসলের যত্নে বুদ্ধিমান সহায়তার শুরু এখানেই।' })).toBeInTheDocument()
+    expect(screen.getByText('ফসলের ছবি দিন')).toBeInTheDocument()
+    expect(screen.getByText('ফসলের উন্নত যত্ন শুরু হোক এখানেই।')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: /আপনি কী লক্ষ করেছেন/ })).toHaveValue('Brown marks on leaves')
+    await waitFor(() => expect(document.documentElement.lang).toBe('bn'))
+    expect(localStorage.getItem(languageStorageKey)).toBe('bn')
+    expect(screen.getByRole('button', { name: 'বাংলা' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('renders the English image-analysis labels and updates them to Bangla', async () => {
@@ -78,12 +80,10 @@ describe('KrishiLens bilingual interface', () => {
     )
     expect(screen.getByRole('heading', { name: 'Segment a crop image' })).toBeInTheDocument()
     expect(screen.getByText('Candidate visual region')).toBeInTheDocument()
-    await user.selectOptions(
-      screen.getByRole('combobox', { name: 'Choose display language' }),
-      'bn',
-    )
+    await user.click(screen.getByRole('button', { name: 'বাংলা' }))
     expect(await screen.findByRole('heading', { name: 'ফসলের ছবির অংশ চিহ্নিত করুন' })).toBeInTheDocument()
     expect(screen.getByText('যে দৃশ্যমান অংশটি খুঁজবেন')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'বাংলা' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('localizes stable API error codes', async () => {
