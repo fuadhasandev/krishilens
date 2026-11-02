@@ -73,6 +73,21 @@ Use an Atlas database user with only the permissions the service needs, TLS, and
 
 Cloudinary uploads must remain `authenticated`. Case image downloads go through the owner-authorized API. Do not expose signed delivery URLs, make assets public, or return credentials to the browser.
 
+Voice transcription uses the existing server-side `MODEL_API_KEY`; no additional secret or Render binary is required. The browser converts MediaRecorder output to mono, 16-bit PCM WAV at 24 kHz with Web Audio before upload. The API validates the WAV in memory, limits it to 60 seconds and 4 MB, allows five requests per IP every ten minutes through the existing process-local limiter, and admits at most three in-flight voice uploads/transcriptions per server process. Audio is not written to disk or persisted. This implementation adds no FFmpeg package or system-binary requirement. Browser codec support and audio decoding vary by device; if the selected browser cannot produce or decode a supported recording format, the UI asks the farmer to retry or type the question.
+
+### Voice transcription verification
+
+The regular backend tests mock Meta responses. An opt-in live test sends real English and Bengali WAV fixtures to Meta and may incur API charges. Use only audio with explicit permission; the fixtures remain at the caller-provided paths and the test does not log the recognized text.
+
+```sh
+VOICE_TEST_AUDIO_CONSENT=I_HAVE_PERMISSION_TO_SEND_THESE_AUDIO_FIXTURES_TO_META \
+VOICE_TEST_ENGLISH_WAV=/absolute/path/to/consented-english.wav \
+VOICE_TEST_BENGALI_WAV=/absolute/path/to/consented-bengali.wav \
+npm run test:voice:live --prefix server
+```
+
+The fixtures must be mono, 16-bit PCM WAV at 16 kHz or 24 kHz and no longer than 60 seconds. Configure `MODEL_API_KEY` only in the server environment. Do not enable this test in routine CI.
+
 ## 3. Disposable real-service integration test
 
 `npm run test:e2e --prefix server` runs a real integration against a local child API process and **dedicated external test services**. It does not mock SAM, Muse, MongoDB, or Cloudinary, and does not call or mutate the deployed production API. It creates a new database named `krishilens_e2e_<run-uuid>` for each run, creates a random owner and case, and saves cleanup metadata without access tokens or credentials.

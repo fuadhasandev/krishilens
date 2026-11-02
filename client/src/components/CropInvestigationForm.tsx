@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { analyzeCrop } from '../services/cropAnalysis'
 import { currentLanguage } from '../i18n'
 import { Alert, Button, Select, Textarea } from './ui'
+import { VoiceRecorder } from './VoiceRecorder'
 import type {
   Crop,
   CropAnalysisResponse,
@@ -95,6 +96,12 @@ export function CropInvestigationForm() {
             {new Intl.NumberFormat(i18n.resolvedLanguage).format(2000)}
           </span>
         </label>
+        <VoiceRecorder
+          onTranscript={(transcript) => {
+            setQuestion(transcript)
+            setError('')
+          }}
+        />
 
         <Button
           className="w-full sm:w-auto sm:text-base"

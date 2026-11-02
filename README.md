@@ -92,7 +92,9 @@ Additional commands:
 | `npm run dev --prefix server` | Run only the backend |
 | `npm run typecheck --prefix server` | Type-check the backend |
 
-The health check is available at `GET http://localhost:3000/api/health`. Text-only crop investigation is available at `POST http://localhost:3000/api/ai/analyze`. SAM image segmentation is available at `POST http://localhost:3000/api/images/segment`.
+The health check is available at `GET http://localhost:3000/api/health`. Text-only crop investigation is available at `POST http://localhost:3000/api/ai/analyze`. SAM image segmentation is available at `POST http://localhost:3000/api/images/segment`. Voice transcription is available at `POST http://localhost:3000/api/voice/transcribe`; send multipart `audio` (mono 16-bit PCM WAV at 16/24 kHz, max 4 MB and 60 seconds) and `language` (`en` or `bn`). Add a bearer token with `scanId` or `sessionId` for existing investigation access.
+
+Voice questions use `POST /api/voice/transcribe`. The browser records in a supported native format, converts it to mono 16-bit PCM WAV, and sends the WAV for English or Bengali transcription. The API validates the WAV and forwards it to Meta; raw audio is held in memory only. See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for rate limits, runtime notes, and the explicitly opted-in live test.
 
 ### SAM image segmentation API
 

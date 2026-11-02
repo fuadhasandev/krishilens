@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { LoaderCircle, Send } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card, Textarea } from './ui'
+import { VoiceRecorder } from './VoiceRecorder'
+import type { VoiceAuthorization } from '../services/voice'
 
 interface FarmerQuestionProps {
   mode: 'start' | 'answer'
@@ -9,6 +11,7 @@ interface FarmerQuestionProps {
   prompt?: { question: string; why: string }
   loading: boolean
   onSubmit: (answer: string) => Promise<boolean>
+  authorization?: VoiceAuthorization
 }
 
 export function FarmerQuestion({
@@ -17,6 +20,7 @@ export function FarmerQuestion({
   prompt,
   loading,
   onSubmit,
+  authorization,
 }: FarmerQuestionProps) {
   const { t, i18n } = useTranslation()
   const [answer, setAnswer] = useState('')
@@ -59,6 +63,11 @@ export function FarmerQuestion({
           value={answer}
         />
       </label>
+      <VoiceRecorder
+        authorization={authorization}
+        disabled={loading}
+        onTranscript={setAnswer}
+      />
       <Button
         className="min-h-12"
         disabled={loading || !answer.trim()}

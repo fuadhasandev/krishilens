@@ -12,6 +12,7 @@
     "start": "node dist/dev.js",
     "typecheck": "tsc --noEmit",
     "test": "IMAGE_STORAGE_PROVIDER=local tsx --test test/*.test.ts",
+    "test:voice:live": "RUN_REAL_VOICE_TRANSCRIPTION_TESTS=1 tsx --test test/voice.live.integration.test.ts",
     "test:cloudinary": "tsx --test test/cloudinary.integration.test.ts",
     "test:e2e": "RUN_REAL_E2E_TESTS=1 tsx --test test/realE2e.integration.test.ts",
     "test:e2e:cleanup": "tsx scripts/cleanupE2eRun.ts"

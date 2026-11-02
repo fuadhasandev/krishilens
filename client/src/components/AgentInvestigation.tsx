@@ -149,6 +149,7 @@ export function AgentInvestigation({
 
       {!session && (
         <FarmerQuestion
+          authorization={{ scanId, accessToken: scanAccessToken }}
           loading={loading}
           mode="start"
           onSubmit={handleStart}
@@ -228,6 +229,7 @@ export function AgentInvestigation({
 
           {session.status === 'awaiting_farmer' && pendingQuestion && (
             <FarmerQuestion
+              authorization={{ sessionId: session.sessionId, accessToken }}
               loading={loading}
               mode="answer"
               onSubmit={handleAnswer}
