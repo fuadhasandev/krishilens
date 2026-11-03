@@ -9,7 +9,7 @@ const recordingMimeTypes = [
 export const MAX_VOICE_DURATION_SECONDS = 60
 
 export function supportedRecordingMimeType(
-  mediaRecorder: typeof MediaRecorder,
+  mediaRecorder: Pick<typeof MediaRecorder, 'isTypeSupported'>,
 ): string | null {
   if (typeof mediaRecorder.isTypeSupported !== 'function') {
     return null
