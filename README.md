@@ -1,218 +1,379 @@
-# KrishiLens
+# 🌱 KrishiLens
 
-KrishiLens is a voice-first, mobile-first crop-care investigation assistant for smallholder farmers, especially in Bangladesh. Farmers will be able to ask crop-health questions in Bangla, share crop images, and receive evidence-grounded guidance with follow-up investigations over time.
+### Smarter Farming Starts Here.
 
-The project includes a text-only Muse Spark preview, SAM 3.1 image segmentation, and a bounded Muse Spark tool-calling crop investigation. Image segmentation identifies candidate visual regions only; it does not diagnose crop disease or establish validated severity.
+KrishiLens is an AI-powered crop-care investigation agent that helps farmers observe crop problems, investigate symptoms, ask follow-up questions, and monitor changes over time.
 
-## Technology stack
+**Meta Global AI Developer Hackathon 2026 · Indie Developer Track · Build for Your World**
 
-- **Frontend:** React, Vite, TypeScript, Tailwind CSS (official Vite plugin), React Router, Axios, Lucide React, i18next, react-i18next
-- **Backend:** Node.js, Express, TypeScript, `tsx`, dotenv, Zod, OpenAI SDK (Meta Responses API), Multer, Sharp
-- **SAM parsing:** `@meta-sam/parser` for streamed segmentation records and binary masks
-- **Data:** MongoDB Atlas, Mongoose; Zod validates API requests
-- **AI:** Muse Spark text reasoning and SAM 3.1 segmentation via Meta Model API
-- **Planned AI:** Muse Voice Transcribe
+**[Try the Live Demo](https://krishilens.fuadhasan.dev/)** · **[YouTube Demo](https://youtu.be/i7V1aa78WoE)** · **[GitHub](https://github.com/fuadhasandev/krishilens)**
 
-## Local setup
+![Meta AI](https://img.shields.io/badge/AI-Meta_Model_API-0866FF) ![React](https://img.shields.io/badge/React-19-149ECA) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6) ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248)
 
-Requirements: Node.js 22.x and npm.
+[![KrishiLens Demo Video](https://img.youtube.com/vi/i7V1aa78WoE/hqdefault.jpg)](https://youtu.be/i7V1aa78WoE)
 
-For Vercel frontend and Render API deployment guidance, see [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md).
+**[▶ Watch the Full 3-Minute Demo](https://youtu.be/i7V1aa78WoE)**
 
-1. Install dependencies from the repository root:
+## The problem
 
-   ```sh
-   npm install
-   npm install --prefix client
-   npm install --prefix server
-   ```
+For smallholder farmers, especially in Bangladesh, a discolored leaf raises questions that a single image cannot settle. Symptoms can look alike, timely agricultural expertise can be difficult to reach, and language barriers make advice harder to use. Without a record of earlier observations, it is also difficult to tell whether a crop's visible condition has changed.
 
-2. Create the backend environment file:
+KrishiLens supports an ongoing investigation: observe an image, describe the problem in English or Bangla, answer a contextual question, review a cautious report, and return to a saved crop case for another scan. It keeps visual measurements separate from agricultural interpretation and makes missing evidence explicit.
 
-   ```sh
-   cp server/.env.example server/.env
-   ```
+## Try it
 
-   The root `.env.example` lists the backend variables for reference. Keep real credentials in an ignored `.env` file; never put server secrets in frontend variables.
+1. Open **[KrishiLens](https://krishilens.fuadhasan.dev/)** and select English or Bangla. New users start in Bangla.
+2. Start image analysis and upload a JPEG, PNG, or WebP crop image, up to 4 MB.
+3. Review the SAM overlay and measurement availability. Describe your concern by typing or recording a question; edit the transcript before submitting.
+4. Start the agent investigation, answer any follow-up question, and review its observations, evidence limits, and safe next steps.
+5. Open case history to create a crop case, upload a baseline through its re-check form, and return with another image for comparison.
 
-3. Optionally configure the frontend API URL:
+The standalone image investigation and saved-case re-check workflow are separate paths today. Standalone investigations are not automatically attached to crop cases. Render cold starts and external model latency can delay responses.
 
-   ```sh
-   cp client/.env.example client/.env
-   ```
+## Implemented features
 
-4. Start both applications:
+“Implemented” below describes the checked-in code, not a claim that every production workflow has passed verification.
 
-   ```sh
-   npm run dev
-   ```
+| Feature | What the application does |
+| --- | --- |
+| AI crop investigation | Runs a bounded Muse Spark tool-calling loop over validated scan observations and the farmer's question. |
+| SAM 3.1 segmentation | Requests leaf and candidate affected-region masks, parses streamed results, and displays an overlay. SAM does not diagnose disease. |
+| Candidate region measurement | Calculates the candidate-mask intersection with the leaf mask as a percentage of leaf pixels, only when validation permits it. |
+| Contextual follow-up | Saves one focused question, pauses for the farmer, then resumes the investigation with the answer. |
+| Agricultural evidence lookup | Searches a curated rice reference collection. Its current BRRI record supports institutional referral only; no symptom-specific agronomic passage is available. |
+| English and Bangla | Provides bundled interface translations, language-aware requests, and explicit translation of agent reports/questions while preserving originals. |
+| Muse Voice transcription | Records in the browser, converts audio to WAV, and transcribes English or Bengali through Meta. Transcripts remain editable. |
+| Persistent cases and sessions | Uses MongoDB-backed cases, scans, investigations, traces, re-checks, anonymous owners, and agent state. |
+| Private case images | Uses local private storage for development and authenticated Cloudinary storage for production, delivered through owner-authorized API requests. |
+| Re-check and comparison | Saves subsequent scans, checks measurement and capture comparability, and reports percentage-point changes with cautious progress notes. |
+| Responsible AI | Validates tools and reports, rejects unsupported claims, and preserves unavailable measurements and insufficient-evidence outcomes. |
+| Re-check dates | Displays upcoming/overdue dates in the app; automatic notifications are a future improvement. |
 
-   The frontend runs at <http://localhost:5173> and the API at <http://localhost:3000>.
+Rice is the focus of the curated reference collection. The forms/API also accept wheat, maize, jute, and other crops; those choices do not establish validated multi-crop diagnostic coverage.
 
-## Environment variables
+## How it works
 
-| Variable | Purpose | Current behavior |
+The conceptual journey is **Farmer → Upload Image → SAM Segmentation → Validate Measurements → Muse Spark Investigation → Agent Tool Calls → Follow-up Questions → Evidence-Based Outcome → Save Case → Re-check**. The actual implementation has separate agent and case-persistence paths:
+
+```mermaid
+flowchart TD
+    Farmer["Farmer: English or Bangla"] --> Upload["Upload crop image"]
+    Farmer --> Voice["Muse Voice transcription"]
+    Voice --> Edit["Review and edit transcript"]
+    Edit --> Question["Farmer question"]
+    Upload --> SAM["SAM: leaf and candidate region masks"]
+    SAM --> Validate["Validate masks and calculate available measurements"]
+    Validate --> Scan["MongoDB-backed agent scan metadata"]
+    Scan --> Muse["Muse Spark investigation"]
+    Question --> Muse
+    Muse --> Tools["Validated agent tool calls"]
+    Tools --> Inspect["inspect_scan"]
+    Tools --> Lookup["lookup_guidance"]
+    Inspect --> Muse
+    Lookup --> Muse
+    Tools --> Ask["ask_farmer: pause for follow-up"]
+    Ask --> Answer["Farmer answer"]
+    Answer --> Muse
+    Tools --> Safety["check_safety and finalize_report"]
+    Safety --> Report["Structured report or insufficient evidence"]
+    Report --> Session["Persist agent session in MongoDB"]
+    Farmer --> Case["Create saved crop case"]
+    Case --> Recheck["Upload baseline or re-check image"]
+    Recheck --> CaseSAM["SAM segmentation and validation"]
+    CaseSAM --> Private["Private image storage and saved scan"]
+    Private --> Compare["Deterministic comparison with prior scan if available"]
+    Compare --> Progress["Muse progress note or cautious fallback"]
+    Progress --> History["Save case history in MongoDB"]
+    History --> Recheck
+```
+
+### Visual measurements, not diagnoses
+
+The backend decodes, auto-rotates, and resizes uploaded images to at most 2048 × 2048 pixels while preserving aspect ratio. It sends a crop-specific leaf concept to SAM, tries the generic `leaf` concept if no match is found, and requests the selected candidate region separately when a leaf is detected.
+
+```text
+candidate affected-region percentage =
+    pixels in (candidate mask ∩ leaf mask) / leaf-mask pixels × 100
+```
+
+Green outlines show the leaf; orange pixels show the candidate region, including any portion outside the leaf. Missing, invalid, disjoint, or unreliable masks can make the estimate unavailable or require review. An unavailable estimate must not become a zero-damage claim. This geometric measurement is neither a disease diagnosis nor validated disease severity.
+
+## Agentic AI architecture
+
+KrishiLens implements a **plan–act–observe loop** in [server/src/agent/loop.ts](server/src/agent/loop.ts). Muse Spark chooses permitted tool actions, receives validated outputs, and continues or pauses for farmer input. It uses Meta's Responses API function-calling protocol with matching `function_call_output` items and `previous_response_id`.
+
+The [tool registry](server/src/agent/toolRegistry.ts) exposes these exact functions:
+
+| Tool | Responsibility |
+| --- | --- |
+| `inspect_scan` | Read original validated scan observations without changing measurements. |
+| `lookup_guidance` | Retrieve curated rice reference records and explicitly report missing relevant evidence. |
+| `ask_farmer` | Save a contextual follow-up question and pause until an answer arrives. |
+| `check_safety` | Check a proposed report against the original scan and retrieved evidence. |
+| `finalize_report` | Validate and produce the structured investigation report. |
+
+Execution is bounded to six model turns and eight tool calls per turn. The server validates tool names, input schemas, and output schemas, and blocks identical repeated calls without new farmer information. Sanitized traces show actions and evidence references rather than hidden model reasoning or farmer answers.
+
+Reports include visible observations, tentative possible causes, missing information, safe next steps, citations, escalation recommendations, evidence status, and measurement quality. Backend checks reject un-retrieved citations, unsupported percentages, institutional sources used as disease evidence, and chemical treatment instructions. Original measurements and citations come from validated server data.
+
+This agent can choose tools, pause for a human answer, resume a persistent session, and validate a structured outcome. Its saved-case workflow adds deterministic follow-up comparisons. Those behaviors go beyond a single predicted label or an unstructured chat reply. **The current evidence collection cannot support symptom-level disease conclusions:** a truthful insufficient-evidence result is an intended outcome.
+
+## Meta AI models
+
+| Model | Purpose | Integration status |
 | --- | --- | --- |
-| `PORT` | Backend HTTP port | Defaults to `3000` |
-| `CLIENT_URL` | Allowed frontend origin for CORS | Defaults to `http://localhost:5173` |
-| `MODEL_API_KEY` | Server-side Meta Model API credential | Required for live AI requests; never sent to the browser |
-| `META_BASE_URL` | Meta Model API base URL | Defaults to `https://api.meta.ai/v1` |
-| `MONGODB_URI` | MongoDB connection string | Required by the API; startup fails clearly if missing or unreachable |
-| `LOCAL_IMAGE_STORAGE_DIR` | Private local image directory | Development-only adapter; defaults to `./data/private-images` from the server directory |
-| `IMAGE_STORAGE_PROVIDER` | Private image adapter (`local` or `cloudinary`) | Defaults to `local` for development; production requires `cloudinary` |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | Required with the `cloudinary` provider; server-side only |
-| `CLOUDINARY_API_KEY` | Cloudinary API key | Required with the `cloudinary` provider; server-side only |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret | Required with the `cloudinary` provider; server-side only |
-| `VITE_API_URL` | Backend origin used by the browser | Optional for local Vite development (defaults to `http://localhost:3000`); required for deployment. Never place secrets in `VITE_*` variables. |
+| `muse-spark-1.3` | Tool-calling investigation, text-only crop questions, explicit report translation, and cautious re-check progress notes. | Implemented through the Meta Responses API using the OpenAI SDK transport; mocked automated coverage and an opt-in real-service E2E test. |
+| `sam-3.1` | Segment leaf and candidate visual regions for backend mask validation and measurement. | Implemented with `@meta-sam/parser`; parser/mask/error tests and an opt-in real-service E2E test. |
+| `muse-voice-transcribe-1.0` | Convert English/Bengali speech into editable question text. | Implemented through Meta's `/asr/transcribe`; mocked tests and an opt-in live test with consented fixtures. |
 
-## Development commands
+Voice supplies text; SAM supplies visual masks; Muse Spark investigates validated observations and farmer context through tools. The agent receives scan metadata rather than using SAM as a disease classifier. Implementation and test availability do not establish current production model success; see [Testing and verification](#testing-and-verification).
 
-Run these from the repository root:
+## Tech stack
+
+Versions below are declared dependency ranges in the package manifests, not independently verified versions of deployed services.
+
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React `^19.3.1`, Vite `^8.3.5`, TypeScript `~7.0.2`, Tailwind CSS `^4.3.3`, react-i18next `^17.1.9`, i18next `^26.5.12`, React Router, Axios |
+| Backend | Node.js `22.x`, Express `^5.1.0`, TypeScript `~5.9.3`, tsx, Zod, Multer, Sharp |
+| AI | Meta Model API; OpenAI SDK `^6.49.0` as transport; `@meta-sam/parser` `^0.1.0`; Muse Spark, SAM, Muse Voice |
+| Database | MongoDB Atlas / compatible local MongoDB, Mongoose `^9.11.4` |
+| Image storage | Cloudinary SDK `^2.11.0`; authenticated delivery; private local development adapter |
+| Hosting | Vercel frontend, Render API |
+| Testing | Vitest `^4.1.12`, Testing Library, jsdom, Node test runner through tsx |
+
+## Install and run locally
+
+### Prerequisites
+
+- **Node.js 22.x and npm**, as required by all three package manifests.
+- A reachable MongoDB Atlas database or local MongoDB instance. The API connects before listening and fails startup if the database is unavailable.
+- A server-side Meta Model API key for live model requests.
+- Cloudinary credentials when using cloud image storage; local private storage is the development default.
+
+```sh
+git clone https://github.com/fuadhasandev/krishilens.git
+cd krishilens
+npm install
+npm install --prefix client
+npm install --prefix server
+cp server/.env.example server/.env
+cp client/.env.example client/.env
+```
+
+Edit the copied environment files locally. The root [.env.example](.env.example) is a backend reference; runtime backend configuration is loaded from `server/.env`. Keep credentials out of Git and out of browser variables.
+
+| Variable | Location | Purpose / default |
+| --- | --- | --- |
+| `PORT` | Server | HTTP port; defaults to `3000`. |
+| `CLIENT_URL` | Server | Exact allowed frontend origin; defaults to `http://localhost:5173`. |
+| `MODEL_API_KEY` | Server | Meta credential required for real AI requests. |
+| `META_BASE_URL` | Server | Defaults to `https://api.meta.ai/v1`. |
+| `MONGODB_URI` | Server | Required MongoDB connection string; example uses local `krishilens` database. |
+| `IMAGE_STORAGE_PROVIDER` | Server | `local` by default; production requires `cloudinary`. |
+| `LOCAL_IMAGE_STORAGE_DIR` | Server | Development private images; defaults to `./data/private-images` from the server directory. |
+| `CLOUDINARY_CLOUD_NAME` | Server | Required with Cloudinary storage. |
+| `CLOUDINARY_API_KEY` | Server | Required with Cloudinary storage; server-only. |
+| `CLOUDINARY_API_SECRET` | Server | Required with Cloudinary storage; server-only. |
+| `VITE_API_URL` | Client | Public backend origin; local default is `http://localhost:3000`. Production builds require an HTTPS origin without `/api`. Never put secrets in `VITE_*`. |
+
+Start both apps from the repository root:
+
+```sh
+npm run dev
+```
+
+Open <http://localhost:5173>. The API listens at <http://localhost:3000>; check <http://localhost:3000/api/health>.
+
+### Commands
+
+Run from the repository root:
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Run the Vite frontend and `tsx` backend together |
-| `npm run build` | Build the frontend and compile the backend |
-| `npm run typecheck` | Check both TypeScript projects (the client check also produces its production build) |
+| `npm run dev` | Start frontend and backend together. |
+| `npm run dev --prefix client` | Start Vite only. |
+| `npm run dev --prefix server` | Start the backend with tsx watch. |
+| `npm test` | Run frontend tests, then backend tests. Live integration tests are opt-in. |
+| `npm run test --prefix client` | Run frontend Vitest tests. |
+| `npm run test --prefix server` | Run backend Node/tsx tests with local image storage. |
+| `npm run lint --prefix client` | Run Oxlint. |
+| `npm run typecheck --prefix server` | Check backend types without emitting files. |
+| `npm run build --prefix server` | Compile backend and copy agent assets. |
+| `npm start --prefix server` | Run compiled backend; build and configure it first. |
+| `npm run preview --prefix client` | Preview an already built frontend locally. |
 
-Production build and typecheck commands require `VITE_API_URL` to be set to the HTTPS backend origin. See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for a local verification command.
+Root `typecheck` also builds the client. Supply a public HTTPS API origin for both root build commands:
 
-The real-service end-to-end workflow uses a unique disposable Atlas database and a dedicated Cloudinary account. Configure the `E2E_*` values in the ignored `server/.env.e2e` file, then run `npm run test:e2e --prefix server`. It invokes real SAM and Muse requests and removes the current run's Cloudinary assets and database; setup, licensed image attribution, and recovery from incomplete cleanup are documented in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). Do not point integration tests at production services.
+```sh
+VITE_API_URL=https://krishilens-api.onrender.com npm run typecheck
+VITE_API_URL=https://krishilens-api.onrender.com npm run build
+```
 
-The narrower optional Cloudinary integration test can be run with `RUN_CLOUDINARY_INTEGRATION_TESTS=1 npm run test:cloudinary --prefix server`. It requires `IMAGE_STORAGE_PROVIDER=cloudinary`, a `MONGODB_URI` database named `krishilens_integration_test` (or a generated `krishilens_e2e_*` name), and the explicit `E2E_CLOUDINARY_CONFIRMATION` value documented in [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md). Live integration tests refuse unrecognized database names.
+## API overview
 
-Additional commands:
+All routes below are mounted under `/api`. Protected requests use `Authorization: Bearer <token>`; never put tokens in URLs or logs. These are separate scan, investigation-session, and anonymous-owner tokens, not interchangeable account credentials.
 
-| Command | Purpose |
-| --- | --- |
-| `npm test` | Run backend agent, upload, parser, mask-math, and provider error tests |
-| `npm run test --prefix client` | Run bilingual UI, locale parity, persistence, and request-language tests |
-| `npm run lint --prefix client` | Lint the frontend |
-| `npm run dev --prefix client` | Run only the frontend |
-| `npm run dev --prefix server` | Run only the backend |
-| `npm run typecheck --prefix server` | Type-check the backend |
-
-The health check is available at `GET http://localhost:3000/api/health`. Text-only crop investigation is available at `POST http://localhost:3000/api/ai/analyze`. SAM image segmentation is available at `POST http://localhost:3000/api/images/segment`. Voice transcription is available at `POST http://localhost:3000/api/voice/transcribe`; send multipart `audio` (mono 16-bit PCM WAV at 16/24 kHz, max 4 MB and 60 seconds) and `language` (`en` or `bn`). Add a bearer token with `scanId` or `sessionId` for existing investigation access.
-
-Voice questions use `POST /api/voice/transcribe`. The browser records in a supported native format, converts it to mono 16-bit PCM WAV, and sends the WAV for English or Bengali transcription. The API validates the WAV and forwards it to Meta; raw audio is held in memory only. See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for rate limits, runtime notes, and the explicitly opted-in live test.
-
-### SAM image segmentation API
-
-Send `multipart/form-data` with:
-
-| Field | Required | Values |
+| Method and endpoint | Purpose | Access |
 | --- | --- | --- |
-| `image` | Yes | JPEG, PNG, or WebP; maximum 4 MB |
-| `crop` | No | `rice` (default), `wheat`, `maize`, `jute`, `other` |
-| `target` | No | `brown spots` (default), `yellow discolored region`, `damaged leaf region` |
-| `language` | No | `bn` (default) or `en`; included with browser requests |
+| `GET /api/health` | API responsiveness. | No token. Does not test all external services. |
+| `POST /api/ai/analyze` | Text-only crop question, separate from the tool-calling agent. | No token. |
+| `POST /api/images/segment` | Upload image, segment, return measurements/overlay and `scanId` / `scanAccessToken`. | No token. |
+| `POST /api/voice/transcribe` | Transcribe multipart `audio` with `language`. | No token without context; matching scan/session token required if `scanId` or `sessionId` is provided. |
+| `POST /api/agent/investigate` | Start investigation with `scanId`, `crop`, `language`, and `question`; returns `sessionId` and `accessToken`. | Scan token. |
+| `GET /api/agent/:sessionId` | Read current investigation. | Session token. |
+| `POST /api/agent/:sessionId/answer` | Resume with `{ "answer": "…" }`; optional `language` must match the session. | Session token. |
+| `POST /api/agent/:sessionId/translate` | Explicit translation with `{ "language": "bn" }` or `en`; preserves original text. | Session token. |
+| `POST /api/cases` | Create case with `crop` and `language`; issues `ownerAccessToken` once for a new anonymous owner. | Initial creation may omit token; send owner token for subsequent cases. |
+| `GET /api/cases?page=1&limit=20` | List caller's cases. | Owner token. |
+| `GET /api/cases/:caseId` | Case details and recent history. | Owner token. |
+| `GET /api/cases/:caseId/scans?page=1&limit=20` | Paginated scan history. | Owner token. |
+| `GET /api/cases/:caseId/investigations?page=1&limit=20` | Paginated investigation records for the case. | Owner token. |
+| `PATCH /api/cases/:caseId/recheck-date` | Set or clear intended re-check date. | Owner token. |
+| `POST /api/cases/:caseId/recheck` | Analyze and save baseline/re-check image and compare with prior scan if present. | Owner token plus UUID `Idempotency-Key` header. |
+| `GET /api/cases/:caseId/scans/:scanId/image` | Stream a private saved image through the API. | Owner token. |
 
-Example:
+### Request details
+
+**Text questions:** JSON `crop` is `rice`, `wheat`, `maize`, `jute`, or `other`; `question` contains 3–2000 characters; `language` is `bn` or `en`. Successful responses contain `success`, `answer`, `model`, and a provider request ID when available.
+
+**Segmentation:** multipart `image` is required; optional `crop` defaults to `rice`, `target` defaults to `brown spots` (also accepts `yellow discolored region` or `damaged leaf region`), and `language` defaults to `bn`.
 
 ```sh
 curl -X POST http://localhost:3000/api/images/segment \
   -F 'image=@rice-leaf.jpg' \
   -F 'crop=rice' \
-  -F 'target=brown spots'
+  -F 'target=brown spots' \
+  -F 'language=en'
 ```
 
-The backend validates and decodes the uploaded image, auto-rotates it, and resizes it to at most 2048 × 2048 while preserving aspect ratio. It first sends the selected crop leaf as a short SAM concept. If that prompt returns no matches, it tries the generic noun phrase `leaf`. When a leaf is found, the selected candidate region is sent in a separate request. These are sequential, one-concept-per-request SAM Responses API calls. The image is held in memory and sent as a data URL; no image files or public upload URLs are stored.
+The response contains normalized image dimensions, leaf/candidate measurements and status, detected objects, a transparent PNG overlay, provider request IDs, and short-lived scan credentials. Standalone uploads are processed in memory; agent scan persistence retains metadata, not the uploaded image.
 
-The JSON response includes `success`, `model`, normalized `image` dimensions, leaf-mask status and pixel count, candidate affected pixel count/percentage/status, detected `objects`, a transparent PNG `overlay.imageUrl`, provider `requestIds`, and short-lived `scanId`/`scanAccessToken` values for an investigation. Keep the access token private; the browser holds it in memory and sends it only in an `Authorization: Bearer` header. The percentage is computed only when validated leaf and candidate masks are available; it is the candidate mask intersection with the leaf mask divided by leaf-mask pixels. This is a geometric estimate of model-selected pixels only, **not** a disease diagnosis or validated severity measure. Missing, invalid, or disjoint masks produce no estimate rather than a zero-damage claim. Overlay green outlines mark the leaf mask; orange pixels show the candidate mask, including portions outside the leaf. The selected interface language is sent as `language`; API status and error codes remain language-neutral.
+**Voice:** multipart `audio` must be mono, 16-bit PCM WAV at 16 or 24 kHz, at most 4 MB and 60 seconds. `language` is required. The browser converts native recordings to 24 kHz WAV; audio remains in memory and is not persisted. The route permits five requests per IP per ten minutes and three active requests per server process. Device codec/decoding support varies; typing remains available.
 
-The endpoint returns 400 for missing/invalid uploads, 413 for files larger than 4 MB, 503 when the model key is unavailable, 429 for provider rate limits, 504 for timeouts, and 502 for other provider failures. Error responses include a friendly `error` and do not expose upstream stack traces or credentials.
+**Re-check:** multipart fields are `image`, `language`, `observations`, optional `previousScanId`, and optional boolean strings `similarLighting`, `similarAngle`, `samePlantRegion`. The current re-check service segments `brown spots`. It saves the image privately and records measurements in MongoDB. A first upload establishes a baseline; later uploads can compare against the most recent or selected scan.
 
-Meta documents SAM 3.1's Responses API and parser at [SAM overview](https://dev.meta.ai/docs/sam/overview), [segmenting](https://dev.meta.ai/docs/sam/segmenting), [client libraries](https://dev.meta.ai/docs/sam/client-libraries), and [API basics](https://dev.meta.ai/docs/cookbook/sam-api-basics).
+Comparable scans require accepted measurements, compatible aspect ratios, and confirmation of similar lighting, angle, and plant region. Change is **current minus previous percentage points**. Unconfirmed or invalid comparisons remain inconclusive. Muse Spark explains the deterministic comparison without changing its numbers; provider failures use a cautious localized fallback. Even a comparable decline indicates only possible visible improvement, never proof of recovery.
 
-### Crop analysis API
+Upload/model routes distinguish validation failures, oversized files, unavailable configuration, rate limits, provider failures, and timeouts with appropriate 400/413/503/429/502/504 responses. Protected routes also enforce authorization and session/state checks.
 
-Request JSON:
+### Persistence and privacy
 
-```json
-{
-  "crop": "rice",
-  "question": "আমার ধানের পাতায় বাদামি দাগ পড়েছে",
-  "language": "bn"
-}
-```
+The browser stores the anonymous owner token in local storage; MongoDB stores its SHA-256 hash. It expires after one year. Clearing storage loses case access; account recovery and cross-device access are not implemented. Scan/session credentials are held in browser memory and have bounded lifetimes; durable database storage does not grant indefinite access.
 
-`crop` must be `rice`, `wheat`, `maize`, `jute`, or `other`. `question` must contain 3–2000 characters. `language` is `bn` (Bangla) or `en` (English).
+MongoDB stores case metadata, validated measurements, sanitized traces, reports, re-checks, and resumable agent state. Only case re-check uploads retain images. Cloudinary assets use `authenticated` delivery; the API retrieves them after checking ownership. Short-lived signed download URLs are not returned to the browser. Existing local references remain readable by the local adapter when the configured provider changes.
 
-Successful response:
+## Testing and verification
 
-```json
-{
-  "success": true,
-  "answer": "…",
-  "model": "muse-spark-1.3",
-  "requestId": "resp_…"
-}
-```
+The repository contains automated tests and explicitly opted-in real-service suites. The existence of a test is not a passing integration or production result.
 
-Validation errors return HTTP 400, an unconfigured model key returns HTTP 503, rate limits return HTTP 429, and upstream/time-out errors return HTTP 502/504. Error responses include `success: false`, `model`, and a friendly `answer`; upstream request IDs are included when available. API keys stay on the backend.
-
-### Agentic crop investigation API
-
-The image-analysis page offers a tool-calling investigation after a successful segmentation. The browser sends the `scanId` and its `scanAccessToken` using a bearer header; the backend creates a separate short-lived investigation token and returns it in the response body:
-
-```http
-POST /api/agent/investigate
-Authorization: Bearer <scanAccessToken>
-Content-Type: application/json
-```
-
-```json
-{
-  "scanId": "<scan-id-from-image-response>",
-  "crop": "rice",
-  "language": "bn",
-  "question": "আমার ধানের পাতায় বাদামি দাগ পড়েছে"
-}
-```
-
-The response contains `sessionId`, the original session `language`, `accessToken`, `status`, a sanitized `trace`, and either a `pendingQuestion`, a final `report`, or a status `message`. Use the session token in an `Authorization: Bearer` header for `GET /api/agent/:sessionId`, `POST /api/agent/:sessionId/answer`, and `POST /api/agent/:sessionId/translate`. Follow-up answers may include the original `{ "language": "bn" | "en" }`; the server checks it and keeps that language for the entire investigation. Translation accepts `{ "language": "bn" | "en" }` and returns a separate translated report/question; it does not overwrite the original case text, observations, measurements, or citations. The UI identifies the original language and only displays translated agent text after the explicit translation action. Never put either access token in a URL or log. Investigation reads are marked `Cache-Control: no-store`.
-
-### Persistent cases and re-checks
-
-The API now connects to MongoDB before listening. Set `MONGODB_URI` in `server/.env` to a MongoDB Atlas URI or a local compatible database. Connection errors report the error class only; the URI and credentials are never logged. Mongoose creates indexes for ownership, related IDs, timestamps, and expiry.
-
-The `Case`, `Scan`, `Investigation`, `Trace`, `Recheck`, `AnonymousOwner`, and `AgentScan` collections store case metadata, validated SAM measurements, protected image references, sanitized traces, assessment text, and resumable agent state. Scan images are stored outside MongoDB. Configure `IMAGE_STORAGE_PROVIDER=local` and `LOCAL_IMAGE_STORAGE_DIR` for development, or use `IMAGE_STORAGE_PROVIDER=cloudinary` with server-only Cloudinary credentials. Cloudinary uploads use the `authenticated` delivery type. The existing bearer-token and case-owner image route retrieves those assets server-side; signed download URLs are short-lived and are never returned to the browser. Existing local references remain readable by the local adapter and are not deleted during provider changes. Production startup requires the Cloudinary provider and all three credentials.
-
-Create a case with `POST /api/cases` and JSON `{ "crop": "rice", "language": "bn" }`. A first-time anonymous browser receives an `ownerAccessToken` once. The client stores it in browser local storage and sends it only as an `Authorization: Bearer` header. The database stores only its SHA-256 hash. The anonymous owner token expires after one year; clearing browser storage loses access. There is no account recovery or cross-device access.
-
-Available case endpoints:
-
-| Endpoint | Purpose |
+| Category | Coverage and execution |
 | --- | --- |
-| `POST /api/cases` | Create a case and, for a new browser session, issue its owner token |
-| `GET /api/cases?page=1&limit=20` | List only the caller's cases |
-| `GET /api/cases/:caseId` | Read a case with its recent scans, investigations, and re-checks |
-| `GET /api/cases/:caseId/scans?page=1&limit=20` | Paginated scan history |
-| `GET /api/cases/:caseId/investigations?page=1&limit=20` | Paginated investigation history |
-| `PATCH /api/cases/:caseId/recheck-date` | Set or clear an intended future re-check date |
-| `POST /api/cases/:caseId/recheck` | Upload, analyze, and save a re-check |
-| `GET /api/cases/:caseId/scans/:scanId/image` | Read a private saved image after owner authorization |
+| Frontend automation | Vitest, Testing Library, and jsdom cover bilingual UI/locale parity, language-aware requests, agent UI, segmentation, voice recording/transcripts, audio conversion, and upload handling. Run `npm run test --prefix client`. |
+| Backend automation | Node's test runner through tsx covers tool calling, report safety/translation, SAM parsing and provider errors, image validation, mask math, storage adapters, database diagnostics, comparison, progress notes, and integration isolation. Run `npm run test --prefix server`. |
+| Meta integration | Regular tests use mocked responses/fixtures. Real SAM and Muse calls belong to the opt-in isolated E2E suite below. |
+| Voice transcription | Mocked validation/provider/UI tests run normally. `npm run test:voice:live --prefix server` requires real consented English and Bengali WAV fixtures and explicit consent configuration. |
+| MongoDB integration | `RUN_MONGODB_INTEGRATION_TESTS=1 npm run test --prefix server` enables persistence tests with an explicitly disposable test database. |
+| Cloudinary private delivery | `RUN_CLOUDINARY_INTEGRATION_TESTS=1 npm run test:cloudinary --prefix server` checks authenticated storage and authorized delivery with a dedicated account and disposable database. |
+| Isolated real-service E2E | `npm run test:e2e --prefix server` starts a local child API and uses real SAM, Muse, Atlas, and Cloudinary; exercises follow-up, report translation, re-check, private images, restart persistence, and cleanup. |
+| Production / staging smoke checks | Separate checks of deployed frontend/API, exact-origin CORS, runtime settings, bilingual workflow, private access, and latency. Local E2E does not verify Render ingress or the deployed browser UI. |
 
-Re-check uploads use multipart fields `image`, `language`, `observations`, optional `previousScanId`, and optional boolean strings `similarLighting`, `similarAngle`, and `samePlantRegion`. Include a UUID `Idempotency-Key` header. Images are validated and normalized, segmented with the existing SAM 3.1 service, then written to private development storage with measurements and metadata saved in MongoDB. The form asks the farmer to confirm comparable lighting, angle, and plant area; missing confirmations or unvalidated affected-area measurements keep the comparison inconclusive. The displayed change is current minus previous percentage points. Even a comparable decline is described only as a possible visible improvement, never proof of recovery.
+**Real-service prerequisites:** use the dedicated `E2E_*` configuration and exact consent/confirmation values in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). The E2E runner creates a unique disposable database and owner-scoped Cloudinary assets, then cleans them up. It never falls back to production credentials. Its two licensed sample images are not a controlled before/after pair, so comparison must remain inconclusive. Cleanup failures retain a run manifest for `npm run test:e2e:cleanup --prefix server -- .e2e-runs/<run-uuid>.json`.
 
-Muse Spark receives only the deterministic comparison status, reasons, and farmer observations for the progress note; the numeric measurements remain separate and cannot be changed by the model. If the Meta API is unavailable or unconfigured, the endpoint stores a cautious localized fallback. An intended date appears as an in-app upcoming/overdue reminder; there is no scheduler or automatic message delivery.
+Voice tests require `VOICE_TEST_AUDIO_CONSENT`, `VOICE_TEST_ENGLISH_WAV`, and `VOICE_TEST_BENGALI_WAV`; the deployment guide provides the exact consent value and audio requirements. Narrower MongoDB/Cloudinary tests validate disposable database names; Cloudinary also requires `E2E_CLOUDINARY_CONFIRMATION`. Never point these tests at production services.
 
-Agent scans and investigation session state now use MongoDB-backed adapters in the running API. Session access tokens remain bearer-only and are stored as hashes; state is bounded by the existing agent execution limits. A persistent agent scan retains validated analysis metadata, not the uploaded image. Only images uploaded through the case re-check workflow are retained and associated with a case. Phase 4 investigations created before this change are not backfilled or automatically attached to a crop case.
+### Latest local verification — November 5, 2026
 
-## Languages
+Executed with Node.js `22.15.0`:
 
-The interface defaults to Bangla (`bn`) for new users and restores only a valid `bn`/`en` preference from `localStorage` (`krishilens.language`). Switching language updates visible static text, document language/title, accessibility labels, and localized number formatting without reloading or resetting the current route or form state. Static copy is bundled in `client/src/i18n/locales/`; it is not machine-translated at runtime. Muse Spark generates investigation content in the language selected when a case starts. If the interface language changes during a case, use the explicit translation action; the original report remains unchanged. Translation output is schema-checked and numeric values/IDs/citations are preserved, but machine translation may still be imperfect.
+- **Backend:** 67 passed, 0 failed, 4 skipped (71 tests). The skipped tests are the opt-in MongoDB, Cloudinary, real-service E2E, and live voice integrations.
+- **Frontend:** 28 passed, 2 failed (30 tests across 8 files), plus 1 unhandled error. Failures concern the crop-question textbox accessibility query and microphone-permission messaging; the unhandled error concerns the missing `MAX_VOICE_DURATION_SECONDS` export in a voice-audio test mock. These remain unresolved; application/test code was not changed for this documentation update.
+- **Public links:** the supplied live homepage and exact YouTube thumbnail returned HTTP 200; the video link resolved to the supplied KrishiLens video. These read-only checks are not complete production workflow smoke tests.
 
-The agent uses the Meta Responses API function-calling protocol (`function_call`, matching `function_call_output` items, and `previous_response_id`). The server validates tool names, arguments, and outputs; runs a maximum of six model turns; blocks repeated tool calls without new farmer information; and pauses at one follow-up question until an answer arrives. Deterministic report checks reject un-retrieved citations, unsupported percentages, non-agronomic sources used as disease evidence, and chemical treatment instructions. Trace entries report actions only and never include hidden model reasoning or farmer answers.
+**Verification status:** live Meta/voice, Atlas persistence, authenticated Cloudinary delivery, isolated E2E, and complete production/staging browser workflows are not asserted as passing in this README. They require the services, fixtures, dedicated test configuration, and deployment access described above. A healthy endpoint alone cannot establish those results.
 
-**Persistence and security limitations:** case access is anonymous and tied to the browser's local storage; it cannot be transferred to another device or recovered if the token is lost. No cloud image-storage adapter, account system, automatic reminders, or backfill of earlier investigations is implemented. A disposable MongoDB integration run is required before claiming database persistence has been verified. The current curated collection contains the accessible BRRI official portal as a referral/institution record only; it has no symptom-specific disease passage, so the guidance tool explicitly reports no symptom-level evidence. Reports must remain tentative/insufficient and refer farmers to qualified local assistance when needed.
+## Safety and limitations
 
-## Planned architecture
+- KrishiLens is an **experimental AI-assisted crop-care application**. Model responses can be inaccurate, and qualified agricultural assessment may still be necessary.
+- SAM measurements describe selected pixels. They do not establish a disease, severity, treatment efficacy, or recovery. Unreliable segmentation leaves measurements unavailable or flagged for review.
+- The current evidence collection is limited to a BRRI institutional referral record. Reports must acknowledge the absence of symptom-specific evidence and remain tentative or insufficient.
+- Re-checks depend on comparable capture conditions. They must not fabricate recovery claims from unrelated images or changing lighting, angles, or plant regions.
+- English/Bangla transcription and machine translation can be imperfect. Review editable transcripts; voice quality and browser support vary by device and language.
+- Anonymous access depends on browser-held credentials. There is no user account system, recovery, or cross-device synchronization.
+- Model requests run synchronously. Render cold starts, database connectivity, and external model latency may delay or interrupt operations. A long browser timeout does not extend hosting request limits; check case history before retrying an uncertain re-check.
+- Re-check dates are in-app reminders only. No scheduled notification delivery or automatic backfill/attachment of standalone investigations is implemented.
 
-- `client/src/` contains the mobile-first React UI, reusable components, pages, service clients, shared types, and assets.
-- `server/src/routes/` exposes API endpoints; `middleware/` handles cross-cutting concerns; `config/` owns runtime configuration.
-- `server/src/agent/` contains the bounded tool-calling loop, Zod-validated tool registry, in-memory test adapters and MongoDB runtime adapters, report safety checks, trace recorder, and scan/guidance/follow-up/report tools. `server/src/services/` contains Muse Spark transport, SAM parsing, image normalization, private image storage, deterministic mask calculations, and scan comparison. The server mediates model API calls so credentials are never sent to the browser.
-- `server/src/models/` contains the MongoDB/Mongoose schemas and indexes; `server/src/routes/cases.ts` implements owner-scoped case, schedule, image, and re-check APIs.
-- `eval/` and `demo/` are reserved for evaluation assets and hackathon demonstrations.
+## Deployment
 
-Voice transcription and persistent user accounts remain out of scope. The current investigation loop is bounded and does not make disease diagnoses or execute chemical treatments. Production deployment requires a private cloud image-storage adapter and a disposable-database integration test. This MVP is not production-ready.
+| Component | Service |
+| --- | --- |
+| Frontend | Vercel |
+| Backend | Render Web Service |
+| Database | MongoDB Atlas |
+| Private images | Cloudinary authenticated storage |
+| AI | Meta Model API |
+
+See **[Deployment and safe verification](docs/DEPLOYMENT.md)** for Render build/start settings, Node 22 pinning, Vercel API-origin configuration, server environment variables, service limits, disposable integration setup, cleanup, and production/staging checks.
+
+Production startup requires `MODEL_API_KEY`, `MONGODB_URI`, an HTTPS `CLIENT_URL`, `IMAGE_STORAGE_PROVIDER=cloudinary`, and all three Cloudinary configuration values. Render supplies `PORT`. Local image files are not durable Render storage. There is no checked-in Render Blueprint; dashboard configuration must be verified separately. The legacy `server/vercel.json` does not configure Render request limits.
+
+## Project structure
+
+```text
+krishilens/
+├── client/
+│   ├── src/
+│   │   ├── components/      # Investigation, voice, segmentation, history UI
+│   │   ├── pages/           # Image analysis, case history/details, re-check
+│   │   ├── i18n/            # English/Bangla resources and locale tests
+│   │   ├── services/        # Browser API clients
+│   │   ├── types/           # Shared frontend contracts
+│   │   └── utils/           # Audio conversion and upload helpers
+│   ├── .env.example
+│   └── package.json
+├── server/
+│   ├── src/
+│   │   ├── agent/           # Bounded loop, tools, stores, report checks, trace
+│   │   ├── config/          # Environment, database, upload limits
+│   │   ├── middleware/      # Rate limits and error handling
+│   │   ├── models/          # Mongoose schemas and indexes
+│   │   ├── routes/          # Health, AI, image, voice, agent, case APIs
+│   │   └── services/        # Meta transport, SAM, storage, comparison
+│   ├── test/                # Automated and opt-in integration suites
+│   ├── scripts/             # Agent asset copy and E2E cleanup
+│   ├── .env.example
+│   └── package.json
+├── docs/DEPLOYMENT.md
+├── demo/                    # Reserved for demonstration assets
+├── eval/                    # Reserved for evaluation assets
+└── package.json             # Combined development/build/test commands
+```
+
+No application screenshots are currently checked in. The demo video above shows the application; the repository's illustration is not presented as a screenshot.
+
+## Roadmap
+
+**Implemented:** bilingual interface, SAM segmentation and validation, tool-calling investigation, contextual follow-up, editable voice transcripts, MongoDB-backed state, private Cloudinary adapter, case history, explicit report translation, and cautious re-check comparisons.
+
+**Next improvements:**
+
+- Stronger multi-crop support backed by evaluations.
+- Broader agricultural knowledge sources with symptom-specific evidence.
+- Better segmentation validation against field examples.
+- Improved voice accuracy across devices, accents, and languages.
+- Automated re-check notifications.
+- Real farmer field testing and documented production/staging verification.
+
+## License
+
+No `LICENSE` file is present in this repository snapshot, so an MIT license or permission grant cannot be confirmed. The repository is publicly linked above; a verified project license remains to be supplied by the maintainer. Third-party models, dependencies, and datasets remain subject to their own terms and licenses. Attribution for the E2E sample images is recorded in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Author
+
+**Fuad Hasan**
+
+[Portfolio](https://www.fuadhasan.dev/) · [GitHub](https://github.com/fuadhasandev) · [LinkedIn](https://linkedin.com/in/fuadhasan05)
+
+---
+
+KrishiLens doesn't just analyze a leaf. It observes, investigates, remembers, and checks again.
