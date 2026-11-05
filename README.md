@@ -6,13 +6,13 @@ KrishiLens is an AI-powered crop-care investigation agent that helps farmers obs
 
 **Meta Global AI Developer Hackathon 2026 · Indie Developer Track · Build for Your World**
 
-**[Try the Live Demo](https://krishilens.fuadhasan.dev/)** · **[YouTube Demo](https://youtu.be/i7V1aa78WoE)** · **[GitHub](https://github.com/fuadhasandev/krishilens)**
+**[Try the Live Demo](https://krishilens.fuadhasan.dev/)** · **[YouTube Demo](https://youtu.be/dPjz6FJ9dDs)** · **[GitHub](https://github.com/fuadhasandev/krishilens)**
 
 ![Meta AI](https://img.shields.io/badge/AI-Meta_Model_API-0866FF) ![React](https://img.shields.io/badge/React-19-149ECA) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6) ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248)
 
-[![KrishiLens Demo Video](https://img.youtube.com/vi/i7V1aa78WoE/hqdefault.jpg)](https://youtu.be/i7V1aa78WoE)
+[![KrishiLens Demo Video](https://img.youtube.com/vi/dPjz6FJ9dDs/hqdefault.jpg)](https://youtu.be/dPjz6FJ9dDs)
 
-**[▶ Watch the Full 3-Minute Demo](https://youtu.be/i7V1aa78WoE)**
+**[▶ Watch the Full 3-Minute Demo](https://youtu.be/dPjz6FJ9dDs)**
 
 ## The problem
 
@@ -364,9 +364,19 @@ No application screenshots are currently checked in. The demo video above shows 
 - Automated re-check notifications.
 - Real farmer field testing and documented production/staging verification.
 
-## License
 
-No `LICENSE` file is present in this repository snapshot, so an MIT license or permission grant cannot be confirmed. The repository is publicly linked above; a verified project license remains to be supplied by the maintainer. Third-party models, dependencies, and datasets remain subject to their own terms and licenses. Attribution for the E2E sample images is recorded in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+## 📄 License
+
+KrishiLens is open-source software licensed under the **MIT License**.
+
+You are free to use, modify, and distribute the source code under the terms of the license.
+
+See the [LICENSE](LICENSE) file for full details.
+
+Copyright © 2026 Fuad Hasan.
+
+**Note:** Third-party AI models, datasets, and images remain subject to their respective licenses and terms of use.
+
 
 ## Author
 
