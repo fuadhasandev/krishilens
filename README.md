@@ -6,23 +6,27 @@ KrishiLens is an AI-powered crop-care investigation agent that helps farmers obs
 
 **Meta Global AI Developer Hackathon 2026 · Indie Developer Track · Build for Your World**
 
-**[Try the Live Demo](https://krishilens.fuadhasan.dev/)** · **[YouTube Demo](https://youtu.be/dPjz6FJ9dDs)** · **[GitHub](https://github.com/fuadhasandev/krishilens)**
+**[Live website](https://krishilens.fuadhasan.dev/)** · **[Watch the demo](https://www.youtube.com/watch?v=dPjz6FJ9dDs)** · **[GitHub](https://github.com/fuadhasandev/krishilens)**
 
 ![Meta AI](https://img.shields.io/badge/AI-Meta_Model_API-0866FF) ![React](https://img.shields.io/badge/React-19-149ECA) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6) ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248)
-
-[![KrishiLens Demo Video](https://img.youtube.com/vi/dPjz6FJ9dDs/hqdefault.jpg)](https://youtu.be/dPjz6FJ9dDs)
-
-**[▶ Watch the Full 3-Minute Demo](https://youtu.be/dPjz6FJ9dDs)**
 
 ## The problem
 
 For smallholder farmers, especially in Bangladesh, a discolored leaf raises questions that a single image cannot settle. Symptoms can look alike, timely agricultural expertise can be difficult to reach, and language barriers make advice harder to use. Without a record of earlier observations, it is also difficult to tell whether a crop's visible condition has changed.
 
+## The solution
+
 KrishiLens supports an ongoing investigation: observe an image, describe the problem in English or Bangla, answer a contextual question, review a cautious report, and return to a saved crop case for another scan. It keeps visual measurements separate from agricultural interpretation and makes missing evidence explicit.
 
-## Try it
+## Demo
 
-1. Open **[KrishiLens](https://krishilens.fuadhasan.dev/)** and select English or Bangla. New users start in Bangla.
+[![Watch the KrishiLens demo on YouTube](https://img.youtube.com/vi/dPjz6FJ9dDs/hqdefault.jpg)](https://www.youtube.com/watch?v=dPjz6FJ9dDs)
+
+**[Watch the updated demo on YouTube](https://www.youtube.com/watch?v=dPjz6FJ9dDs)** · **[Open the live website](https://krishilens.fuadhasan.dev/)**
+
+To try the application:
+
+1. Open **[KrishiLens](https://krishilens.fuadhasan.dev/)** and select English or Bangla. First-time visitors default to English; the selection is saved in the browser.
 2. Start image analysis and upload a JPEG, PNG, or WebP crop image, up to 4 MB.
 3. Review the SAM overlay and measurement availability. Describe your concern by typing or recording a question; edit the transcript before submitting.
 4. Start the agent investigation, answer any follow-up question, and review its observations, evidence limits, and safe next steps.
@@ -30,9 +34,9 @@ KrishiLens supports an ongoing investigation: observe an image, describe the pro
 
 The standalone image investigation and saved-case re-check workflow are separate paths today. Standalone investigations are not automatically attached to crop cases. Render cold starts and external model latency can delay responses.
 
-## Implemented features
+## Key features
 
-“Implemented” below describes the checked-in code, not a claim that every production workflow has passed verification.
+These features are implemented in the checked-in code; that does not mean every workflow has been verified against production services.
 
 | Feature | What the application does |
 | --- | --- |
@@ -42,23 +46,23 @@ The standalone image investigation and saved-case re-check workflow are separate
 | Contextual follow-up | Saves one focused question, pauses for the farmer, then resumes the investigation with the answer. |
 | Agricultural evidence lookup | Searches a curated rice reference collection. Its current BRRI record supports institutional referral only; no symptom-specific agronomic passage is available. |
 | English and Bangla | Provides bundled interface translations, language-aware requests, and explicit translation of agent reports/questions while preserving originals. |
-| Muse Voice transcription | Records in the browser, converts audio to WAV, and transcribes English or Bengali through Meta. Transcripts remain editable. |
+| Muse Voice Transcribe | Records in the browser, converts audio to WAV, and transcribes English or Bengali through Meta's `muse-voice-transcribe-1.0`. Transcripts remain editable. |
 | Persistent cases and sessions | Uses MongoDB-backed cases, scans, investigations, traces, re-checks, anonymous owners, and agent state. |
-| Private case images | Uses local private storage for development and authenticated Cloudinary storage for production, delivered through owner-authorized API requests. |
+| Private case images | Persists saved case re-check images only: local private storage by default in development, or authenticated Cloudinary storage in production, delivered through owner-authorized API requests. Standalone analysis images are processed in memory and not retained. |
 | Re-check and comparison | Saves subsequent scans, checks measurement and capture comparability, and reports percentage-point changes with cautious progress notes. |
 | Responsible AI | Validates tools and reports, rejects unsupported claims, and preserves unavailable measurements and insufficient-evidence outcomes. |
 | Re-check dates | Displays upcoming/overdue dates in the app; automatic notifications are a future improvement. |
 
 Rice is the focus of the curated reference collection. The forms/API also accept wheat, maize, jute, and other crops; those choices do not establish validated multi-crop diagnostic coverage.
 
-## How it works
+## Agentic workflow and architecture
 
 The conceptual journey is **Farmer → Upload Image → SAM Segmentation → Validate Measurements → Muse Spark Investigation → Agent Tool Calls → Follow-up Questions → Evidence-Based Outcome → Save Case → Re-check**. The actual implementation has separate agent and case-persistence paths:
 
 ```mermaid
 flowchart TD
     Farmer["Farmer: English or Bangla"] --> Upload["Upload crop image"]
-    Farmer --> Voice["Muse Voice transcription"]
+    Farmer --> Voice["Muse Voice Transcribe"]
     Voice --> Edit["Review and edit transcript"]
     Edit --> Question["Farmer question"]
     Upload --> SAM["SAM: leaf and candidate region masks"]
@@ -98,7 +102,7 @@ candidate affected-region percentage =
 
 Green outlines show the leaf; orange pixels show the candidate region, including any portion outside the leaf. Missing, invalid, disjoint, or unreliable masks can make the estimate unavailable or require review. An unavailable estimate must not become a zero-damage claim. This geometric measurement is neither a disease diagnosis nor validated disease severity.
 
-## Agentic AI architecture
+### Agentic AI architecture
 
 KrishiLens implements a **plan–act–observe loop** in [server/src/agent/loop.ts](server/src/agent/loop.ts). Muse Spark chooses permitted tool actions, receives validated outputs, and continues or pauses for farmer input. It uses Meta's Responses API function-calling protocol with matching `function_call_output` items and `previous_response_id`.
 
@@ -118,13 +122,13 @@ Reports include visible observations, tentative possible causes, missing informa
 
 This agent can choose tools, pause for a human answer, resume a persistent session, and validate a structured outcome. Its saved-case workflow adds deterministic follow-up comparisons. Those behaviors go beyond a single predicted label or an unstructured chat reply. **The current evidence collection cannot support symptom-level disease conclusions:** a truthful insufficient-evidence result is an intended outcome.
 
-## Meta AI models
+## Models
 
 | Model | Purpose | Integration status |
 | --- | --- | --- |
 | `muse-spark-1.3` | Tool-calling investigation, text-only crop questions, explicit report translation, and cautious re-check progress notes. | Implemented through the Meta Responses API using the OpenAI SDK transport; mocked automated coverage and an opt-in real-service E2E test. |
 | `sam-3.1` | Segment leaf and candidate visual regions for backend mask validation and measurement. | Implemented with `@meta-sam/parser`; parser/mask/error tests and an opt-in real-service E2E test. |
-| `muse-voice-transcribe-1.0` | Convert English/Bengali speech into editable question text. | Implemented through Meta's `/asr/transcribe`; mocked tests and an opt-in live test with consented fixtures. |
+| `muse-voice-transcribe-1.0` | Convert English/Bengali speech into editable question text. | Implemented through Meta's `/asr/transcribe`; mocked tests and an opt-in live test with consented fixtures. English or Bengali is selected from the chosen UI language. |
 
 Voice supplies text; SAM supplies visual masks; Muse Spark investigates validated observations and farmer context through tools. The agent receives scan metadata rather than using SAM as a disease classifier. Implementation and test availability do not establish current production model success; see [Testing and verification](#testing-and-verification).
 
@@ -161,7 +165,7 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Edit the copied environment files locally. The root [.env.example](.env.example) is a backend reference; runtime backend configuration is loaded from `server/.env`. Keep credentials out of Git and out of browser variables.
+Edit the copied environment files locally. The server loads backend settings from `server/.env`; the root [.env.example](.env.example) is a reference template and is not loaded by the app. Keep credentials out of Git and out of browser variables.
 
 | Variable | Location | Purpose / default |
 | --- | --- | --- |
@@ -212,7 +216,7 @@ VITE_API_URL=https://krishilens-api.onrender.com npm run build
 
 ## API overview
 
-All routes below are mounted under `/api`. Protected requests use `Authorization: Bearer <token>`; never put tokens in URLs or logs. These are separate scan, investigation-session, and anonymous-owner tokens, not interchangeable account credentials.
+All routes below are mounted under `/api`. Protected endpoints require an Authorization header containing the appropriate route token; never put tokens in URLs or logs. Scan, investigation-session, and anonymous-owner tokens are separate and are not interchangeable account credentials.
 
 | Method and endpoint | Purpose | Access |
 | --- | --- | --- |
@@ -261,11 +265,11 @@ Upload/model routes distinguish validation failures, oversized files, unavailabl
 
 The browser stores the anonymous owner token in local storage; MongoDB stores its SHA-256 hash. It expires after one year. Clearing storage loses case access; account recovery and cross-device access are not implemented. Scan/session credentials are held in browser memory and have bounded lifetimes; durable database storage does not grant indefinite access.
 
-MongoDB stores case metadata, validated measurements, sanitized traces, reports, re-checks, and resumable agent state. Only case re-check uploads retain images. Cloudinary assets use `authenticated` delivery; the API retrieves them after checking ownership. Short-lived signed download URLs are not returned to the browser. Existing local references remain readable by the local adapter when the configured provider changes.
+MongoDB stores case metadata, validated measurements, sanitized traces, reports, re-checks, and resumable agent state. Only case re-check uploads retain images; standalone analysis images are processed in memory. Development defaults to local private image storage; production startup requires Cloudinary. Cloudinary case images use `authenticated` delivery, and the API retrieves them after checking ownership. Short-lived signed download URLs are not returned to the browser. Existing local references remain readable by the local adapter when the configured provider changes.
 
 ## Testing and verification
 
-The repository contains automated tests and explicitly opted-in real-service suites. The existence of a test is not a passing integration or production result.
+The repository contains automated tests and explicitly opted-in real-service suites. “Implemented” means the feature exists in checked-in code; test coverage does not itself mean a test passed, and neither implies successful production operation.
 
 | Category | Coverage and execution |
 | --- | --- |
@@ -282,17 +286,19 @@ The repository contains automated tests and explicitly opted-in real-service sui
 
 Voice tests require `VOICE_TEST_AUDIO_CONSENT`, `VOICE_TEST_ENGLISH_WAV`, and `VOICE_TEST_BENGALI_WAV`; the deployment guide provides the exact consent value and audio requirements. Narrower MongoDB/Cloudinary tests validate disposable database names; Cloudinary also requires `E2E_CLOUDINARY_CONFIRMATION`. Never point these tests at production services.
 
-### Latest local verification — November 5, 2026
+### Previously recorded local verification — November 5, 2026
 
-Executed with Node.js `22.15.0`:
+The following results were recorded from a local run with Node.js `22.15.0`; they are not results from this README revision:
 
 - **Backend:** 67 passed, 0 failed, 4 skipped (71 tests). The skipped tests are the opt-in MongoDB, Cloudinary, real-service E2E, and live voice integrations.
 - **Frontend:** 28 passed, 2 failed (30 tests across 8 files), plus 1 unhandled error. Failures concern the crop-question textbox accessibility query and microphone-permission messaging; the unhandled error concerns the missing `MAX_VOICE_DURATION_SECONDS` export in a voice-audio test mock. These remain unresolved; application/test code was not changed for this documentation update.
-- **Public links:** the supplied live homepage and exact YouTube thumbnail returned HTTP 200; the video link resolved to the supplied KrishiLens video. These read-only checks are not complete production workflow smoke tests.
+- **Public links checked for this README revision:** the live homepage, updated YouTube thumbnail, and updated video returned HTTP 200. These read-only checks are not complete production workflow smoke tests.
+
+The test suites could not be rerun for this README revision because `npm` is unavailable in the current environment. No new test result is claimed.
 
 **Verification status:** live Meta/voice, Atlas persistence, authenticated Cloudinary delivery, isolated E2E, and complete production/staging browser workflows are not asserted as passing in this README. They require the services, fixtures, dedicated test configuration, and deployment access described above. A healthy endpoint alone cannot establish those results.
 
-## Safety and limitations
+## Limitations
 
 - KrishiLens is an **experimental AI-assisted crop-care application**. Model responses can be inaccurate, and qualified agricultural assessment may still be necessary.
 - SAM measurements describe selected pixels. They do not establish a disease, severity, treatment efficacy, or recovery. Unreliable segmentation leaves measurements unavailable or flagged for review.
@@ -365,13 +371,9 @@ No application screenshots are currently checked in. The demo video above shows 
 - Real farmer field testing and documented production/staging verification.
 
 
-## 📄 License
+## License
 
-KrishiLens is open-source software licensed under the **MIT License**.
-
-You are free to use, modify, and distribute the source code under the terms of the license.
-
-See the [LICENSE](LICENSE) file for full details.
+KrishiLens is licensed under the **MIT License**. See the existing [LICENSE](LICENSE) file for the full terms.
 
 Copyright © 2026 Fuad Hasan.
 
